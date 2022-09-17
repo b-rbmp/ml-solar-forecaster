@@ -180,7 +180,7 @@ class RFSolarRegressor:
             df_data = data_multioutput_supervised[i]
             X_train, X_test, Y_train, Y_test = train_test_split(df_data.drop(labels=[target_output_after_treatment], axis=1, inplace=False), df_data[target_output_after_treatment], test_size=train_test_split_ratio, random_state=43, shuffle=False)
 
-            regressor = RandomForestRegressor(n_estimators=n_estimators, random_state=43, max_features=max_features, max_depth=12)
+            regressor = RandomForestRegressor(n_estimators=n_estimators, random_state=43, max_features=max_features, max_depth=12, n_jobs=-3)
             regressor.fit(X_train, Y_train)
 
             Y_pred = regressor.predict(X_test)

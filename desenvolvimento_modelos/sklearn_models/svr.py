@@ -9,13 +9,13 @@ import numpy as np
 import pandas as pd
 from dataclasses import dataclass, field
 from pandas.util import hash_pandas_object
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.svm import SVR
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 BASE_DIR = "/home/b-rbmp-ideapad/Documents/GitHub/ml-solar-forecaster/"
-RF_MODELS_DIR = BASE_DIR + "desenvolvimento_modelos/sklearn_models/models/randomforest/"
+SVR_MODELS_DIR = BASE_DIR + "desenvolvimento_modelos/sklearn_models/models/svr/"
 
 class HashableDataFrame(pd.DataFrame):
     def __init__(self, obj):
@@ -32,12 +32,12 @@ class HashableDataFrame(pd.DataFrame):
 from dataclasses import dataclass
 
 @dataclass(order=True)
-class RegressorStepModel:
+class SVRStepModel:
     """Classe para guardar informações de cada modelo do problema multioutput"""
     sort_index: int = field(init=False, repr=False)
 
     step: int
-    regressor: RandomForestRegressor
+    regressor: SVR
     mae: float
     mse: float
 
@@ -89,32 +89,30 @@ def create_logger(debug_mode: bool):
     logging_level: int
     handler: logging.FileHandler
     if not debug_mode:
-        handler = logging.FileHandler('random_forest.log')
+        handler = logging.FileHandler('svr.log')
         logging_level = logging.INFO
     else:
-        handler = logging.FileHandler('random_forest.debug')
+        handler = logging.FileHandler('svr.debug')
         logging_level = logging.DEBUG
 
     formatter = logging.Formatter(fmt='%(asctime)s - %(levelname)s - %(message)s', datefmt='%d-%m-%Y %H:%M:%S')
     handler.setFormatter(formatter)
-    logger = logging.getLogger('RFExploracaoLogger')
+    logger = logging.getLogger('SVRExploracaoLogger')
     logger.setLevel(logging_level)
     logger.addHandler(handler)
     return logger
 
 
-class RFSolarRegressor:
-    def __init__(self, target_local: str = "salvador", train_test_split_ratio: float = 0.7, in_n_measures: int = 168, out_n_measures: int = 24, n_estimators: int = 1000, custom_input_features: List[str] = []):
+class SVRSolarRegressor:
+    def __init__(self, target_local: str = "salvador", train_test_split_ratio: float = 0.7, in_n_measures: int = 168, out_n_measures: int = 24):
         self.target_local = target_local
         self.in_n_measures = in_n_measures
         self.out_n_measures = out_n_measures
         self.train_test_split = train_test_split_ratio
-        self.n_estimators = n_estimators
-        self.custom_input_features = custom_input_features
-        self.rodar_instancia_treinamento(target_local=target_local, train_test_split_ratio=train_test_split_ratio, in_n_measures=in_n_measures, out_n_measures=out_n_measures, n_estimators=n_estimators, custom_input_features=custom_input_features)
+        self.rodar_instancia_treinamento(target_local=target_local, train_test_split_ratio=train_test_split_ratio, in_n_measures=in_n_measures, out_n_measures=out_n_measures)
 
     # Funcao que roda uma instãncia de treinamento e retorna o scaler,
-    def rodar_instancia_treinamento(self, target_local: str = "salvador", train_test_split_ratio: float = 0.7, in_n_measures: int = 168, out_n_measures: int = 24, n_estimators: int = 1000, custom_input_features: List[str] = []):
+    def rodar_instancia_treinamento(self, target_local: str = "salvador", train_test_split_ratio: float = 0.7, in_n_measures: int = 168, out_n_measures: int = 24):
 
         # Download dos dados de treinamento
         df_target = pd.read_csv(f"{BASE_DIR}dados/pre_processado/{target_local}.csv")
@@ -122,8 +120,6 @@ class RFSolarRegressor:
         # Remove coluna de Index
         df_target.drop(["Unnamed: 0"], axis=1, inplace=True)
 
-        # Define o valor de max_features da Arvore como 1/3 (melhor do que 1 por default, se não é um bagged ensemble e não uma RF -> Acredito que seja erro do Sklearn)
-        max_features = 0.33
 
         # Preparação dos Dados
 
@@ -145,28 +141,25 @@ class RFSolarRegressor:
 
         # Normalização 
         label_target = "IRRADIÂNCIA"
-        df_target_normalized, scaler = RFSolarRegressor.normalizacao_stock_dfs(df_target=df_target, label_target=label_target)
+        df_target_normalized, scaler = SVRSolarRegressor.normalizacao_stock_dfs(df_target=df_target, label_target=label_target)
 
         # Features Entrada
-        if len(custom_input_features) > 0:
-            input_features_forecast = custom_input_features
-        else:
-            input_features_forecast = [
-                "T2M",
-                "T2MDEW",
-                "T2MWET",
-                "RH2M",
-                "PRECTOTCORR",
-                "WD10M",
-                "WS10M",
-                "WS50M",
-                "WD50M",
-                "PSC",
-                "ano_cos",
-                "ano_sin",
-                "hora_cos",
-                "hora_sin",
-            ]
+        input_features_forecast = [
+            "T2M",
+            "T2MDEW",
+            "T2MWET",
+            "RH2M",
+            "PRECTOTCORR",
+            "WD10M",
+            "WS10M",
+            "WS50M",
+            "WD50M",
+            "PSC",
+            "ano_cos",
+            "ano_sin",
+            "hora_cos",
+            "hora_sin",
+        ]
 
         input_measurements = [
             "IRRADIÂNCIA"
@@ -182,18 +175,18 @@ class RFSolarRegressor:
             step = i + 1
             df_data = data_multioutput_supervised[i]
             X_train, X_test, Y_train, Y_test = train_test_split(df_data.drop(labels=[target_output_after_treatment], axis=1, inplace=False), df_data[target_output_after_treatment], test_size=train_test_split_ratio, random_state=43, shuffle=False)
-
-            regressor = RandomForestRegressor(n_estimators=n_estimators, random_state=43, max_features=max_features, max_depth=12, n_jobs=-3)
+            
+            regressor = SVR(kernel="rbf", tol=1e-3, C=1.0, epsilon=0.1, shrinking=True, cache_size=1000, verbose=True, max_iter=-1)
             regressor.fit(X_train, Y_train)
 
             Y_pred = regressor.predict(X_test)
             mae = mean_absolute_error(y_true=Y_test, y_pred=Y_pred)
             mse = mean_squared_error(y_true=Y_test, y_pred=Y_pred)
 
-            regressor_step_model = RegressorStepModel(step=step, regressor=regressor, mae=mae, mse=mse)
+            regressor_step_model = SVRStepModel(step=step, regressor=regressor, mae=mae, mse=mse)
 
-            filename = f'{step}h.rfmodel'
-            pickle.dump(regressor_step_model, open(RF_MODELS_DIR + filename, 'wb'))
+            filename = f'{step}h.svrmodel'
+            pickle.dump(regressor_step_model, open(SVR_MODELS_DIR + filename, 'wb'))
             
             del regressor, regressor_step_model
             gc.collect()
@@ -231,12 +224,12 @@ class RFSolarRegressor:
 
         return df_copy, scaler
 
-def load_all_rf_models() -> List[RegressorStepModel]:
-    models: List[RegressorStepModel] = []
-    filenames = [name for name in os.listdir(RF_MODELS_DIR) if os.path.isfile(os.path.join(RF_MODELS_DIR, name))]
+def load_all_rf_models() -> List[SVRStepModel]:
+    models: List[SVRStepModel] = []
+    filenames = [name for name in os.listdir(SVR_MODELS_DIR) if os.path.isfile(os.path.join(SVR_MODELS_DIR, name))]
     for f_name in filenames:
-        file = os.path.join(RF_MODELS_DIR, f_name)  # full path
-        model: RegressorStepModel = pickle.load(open(file, 'rb'))
+        file = os.path.join(SVR_MODELS_DIR, f_name)  # full path
+        model: SVRStepModel = pickle.load(open(file, 'rb'))
         model.__post_init__()
         models.append(model)
     return models
@@ -244,72 +237,25 @@ def load_all_rf_models() -> List[RegressorStepModel]:
 LOGGER = create_logger(debug_mode=False)
 
 # Treinamento
-features = [
-    "ano_cos",
-    "ano_sin",
-    "hora_cos",
-    "hora_sin",
-    "RH2M",
-    "WD50M",
-    "PRECTOTCORR",
-    "T2M",
-    "WD10M",
-    "WS50M",
-    "PSC",
-    "T2MWET",
-    "T2MDEW",
-]
-features_a_adicionar = [
-    "WS10M",
-]
-for custom_input_feature in features_a_adicionar:
-    features_nova = features.copy()
-    features_nova.append(custom_input_feature)
-    treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.3, in_n_measures=24, out_n_measures=24, n_estimators=1000, custom_input_features=features_nova)
-    LOGGER.info(f"RESULTADOS PARA: {features_nova}")
-    # Mostrar Resultados
-    models = sorted(load_all_rf_models())
+#treinamento = SVRSolarRegressor(target_local="salvador", train_test_split_ratio=0.3, in_n_measures=24, out_n_measures=24)
 
-    mae_total = 0.00
-    mse_total = 0.00
-    count = 0
-    for model in models:
-        mae = model.mae
-        mse = model.mse
-        mae_total += mae
-        mse_total += mse
-        count += 1
-        LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse}")
+# Mostrar Resultados
+models = sorted(load_all_rf_models())
 
-    mae_global = mae_total/count
-    mse_global = mse_total/count
-    LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global}")
+mae_total = 0.00
+mse_total = 0.00
+count = 0
+for model in models:
+    mae = model.mae
+    mse = model.mse
+    mae_total += mae
+    mse_total += mse
+    count += 1
+    LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse}")
 
-                
-    del treinamento, models
-    gc.collect()
-
-
-
-# treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.3, in_n_measures=24, out_n_measures=24, n_estimators=1000)
-
-# # Mostrar Resultados
-# models = sorted(load_all_rf_models())
-
-# mae_total = 0.00
-# mse_total = 0.00
-# count = 0
-# for model in models:
-#     mae = model.mae
-#     mse = model.mse
-#     mae_total += mae
-#     mse_total += mse
-#     count += 1
-#     LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse}")
-
-# mae_global = mae_total/count
-# mse_global = mse_total/count
-# LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global}")
+mae_global = mae_total/count
+mse_global = mse_total/count
+LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global}")
 
 
 

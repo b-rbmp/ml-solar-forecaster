@@ -74,8 +74,7 @@ instance/
 *.keras
 
 
-# RF models
-*.rfmodel
+
 
 # Sphinx documentation
 docs/_build/
@@ -162,3 +161,6 @@ cython_debug/
 
 *.keras
 *.gz
+*.svrmodel
+*.gtbmodel
+*.rfmodel

@@ -14,7 +14,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
-BASE_DIR = "/home/b-rbmp/Documents/GitHub/ml-solar-forecaster/"
+BASE_DIR = "/home/b-rbmp-ideapad/Documents/GitHub/ml-solar-forecaster/"
 GTB_MODELS_DIR = BASE_DIR + "desenvolvimento_modelos/sklearn_models/models/gradienttreeboosting/"
 
 class HashableDataFrame(pd.DataFrame):
@@ -45,60 +45,44 @@ class RegressorStepModel:
         # sort by step
         self.sort_index = self.step
 
-def gerar_dados_problema_supervisionado(forecast_data: HashableDataFrame, measurements_data: HashableDataFrame, output_data: HashableDataFrame, n_in: int, n_out: int) -> HashableDataFrame:
+def gerar_dados_problema_supervisionado(forecast_data: HashableDataFrame, measurements_data: HashableDataFrame, output_data: HashableDataFrame, n_in: int, n_out: int) -> List[HashableDataFrame]:
+    lista_dfs_outputs: List[HashableDataFrame] = []
     df_target = output_data.copy()
     df_a_deslocar_futuro = pd.concat([forecast_data], axis=1)
     df_a_deslocar_passado = pd.concat([forecast_data, measurements_data], axis=1)
     df_deslocado_passado: pd.DataFrame = df_a_deslocar_passado.copy()
-    colunas_temporais_e_geograficas = ["hora_sin", "hora_cos", "ano_cos", "ano_sin", "longitude", "latitude", "altitude"]
-    df_info_temporal_geografica = df_a_deslocar_futuro[colunas_temporais_e_geograficas]
-    df_a_deslocar_passado.drop(labels=colunas_temporais_e_geograficas, axis=1, inplace=True)
-    df_deslocado_passado.drop(labels=colunas_temporais_e_geograficas, axis=1, inplace=True)
+    colunas_temporais = ["hora_sin", "hora_cos", "ano_cos", "ano_sin"]
+    df_info_temporal = df_a_deslocar_futuro[colunas_temporais]
+    df_a_deslocar_passado.drop(labels=colunas_temporais, axis=1, inplace=True)
+    df_deslocado_passado.drop(labels=colunas_temporais, axis=1, inplace=True)
     # input sequence (t-n, ... t-1)
     for i in range(n_in, 0, -1):
         df_a_deslocar = df_a_deslocar_passado.copy()
         df_deslocado = df_a_deslocar.shift(i)
-        del df_a_deslocar
-        gc.collect()
         df_deslocado = df_deslocado.add_suffix(suffix=f"(t-{i})")
         df_deslocado_passado = pd.concat([df_deslocado_passado, df_deslocado], axis=1)
-        del df_deslocado
-        gc.collect()
 
 
     # forecast sequence (t, t+1, ... t+n)
-    df_a_deslocar_futuro.drop(labels=colunas_temporais_e_geograficas, axis=1, inplace=True)
-    df_deslocado_futuro = pd.DataFrame(dtype=np.float16)
+    df_a_deslocar_futuro.drop(labels=colunas_temporais, axis=1, inplace=True)
+    df_deslocado_futuro = pd.DataFrame(dtype=np.float32)
     for i in range(1, n_out+1):
         df_a_deslocar = df_a_deslocar_futuro.copy()
         df_deslocado = df_a_deslocar.shift(-i)
-        del df_a_deslocar
-        gc.collect()
         df_deslocado = df_deslocado.add_suffix(suffix=f"(t+{i})")
         df_deslocado_futuro = pd.concat([df_deslocado_futuro, df_deslocado], axis=1)
-        del df_deslocado
-        gc.collect()
-    
-    df_deslocado_passado.dropna(inplace=True, axis=0)
-    df_inputs = pd.concat([df_deslocado_passado, df_deslocado_futuro], axis=1)
-    del df_deslocado_passado, df_deslocado_futuro
-    gc.collect()
+        df_inputs = pd.concat([df_deslocado_passado, df_deslocado_futuro], axis=1)
+        df_output = df_target.shift(-i)
+        df_output.rename(columns={"IRRADIÂNCIA": "IRRADIÂNCIA TARGET"}, inplace=True)
+        df_temporal_target = df_info_temporal.shift(-i)
+        df_future_model = pd.concat([df_inputs, df_output, df_temporal_target], axis=1)
+        df_future_model.dropna(inplace=True, axis=0)
+        df_future_model = df_future_model.sort_index(axis=1)
+        lista_dfs_outputs.append(df_future_model)
 
-    df_output = df_target.shift(-n_out)
-    df_output.rename(columns={"IRRADIÂNCIA": "IRRADIÂNCIA TARGET"}, inplace=True)
-    df_output.dropna(inplace=True, axis=0)
-    df_input_output = pd.concat([df_inputs, df_output], axis=1)
-    del df_output
-    gc.collect()
 
-    df_temporal_target = df_info_temporal_geografica.shift(-n_out)
-    df_temporal_target.dropna(inplace=True, axis=0)
-    df_future_model = pd.concat([df_input_output, df_temporal_target], axis=1)
-    del df_temporal_target
-    gc.collect()
-    
-    df_future_model.dropna(axis=0, inplace=True)
-    return df_future_model
+
+    return lista_dfs_outputs
 
  # Configuracao Logging
 def create_logger(debug_mode: bool):
@@ -178,9 +162,6 @@ class GTBSolarRegressor:
             "ano_sin",
             "hora_cos",
             "hora_sin",
-            "latitude",
-            "longitude",
-            "altitude",
         ]
 
         input_measurements = [
@@ -193,12 +174,12 @@ class GTBSolarRegressor:
         del df_target
         gc.collect()
 
+        data_multioutput_supervised = gerar_dados_problema_supervisionado(forecast_data=HashableDataFrame(df_target_normalized[input_features_forecast]), measurements_data=HashableDataFrame(df_target_normalized[input_measurements]), output_data=HashableDataFrame(df_target_normalized.iloc[in_n_measures:][output_features]), n_in=in_n_measures, n_out=out_n_measures)
+
         target_output_after_treatment = "IRRADIÂNCIA TARGET"
         for i in range(0, out_n_measures):
             step = i + 1
-
-            df_data = gerar_dados_problema_supervisionado(forecast_data=HashableDataFrame(df_target_normalized[input_features_forecast]), measurements_data=HashableDataFrame(df_target_normalized[input_measurements]), output_data=HashableDataFrame(df_target_normalized.iloc[in_n_measures:][output_features]), n_in=in_n_measures, n_out=step)
-
+            df_data = data_multioutput_supervised[i]
             X_train, X_test, Y_train, Y_test = train_test_split(df_data.drop(labels=[target_output_after_treatment], axis=1, inplace=False), df_data[target_output_after_treatment], test_size=train_test_split_ratio, random_state=43, shuffle=False)
             del df_data
             gc.collect()

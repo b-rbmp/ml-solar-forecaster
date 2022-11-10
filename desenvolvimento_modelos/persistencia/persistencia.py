@@ -1,5 +1,4 @@
 # Imports
-from functools import lru_cache
 from hashlib import sha256
 from pandas.util import hash_pandas_object
 import pandas as pd
@@ -12,38 +11,6 @@ import matplotlib.dates as mdates
 import scipy as sp
 
 BASE_DIR = "/home/b-rbmp-ideapad/Documents/GitHub/ml-solar-forecaster/"
-
-@lru_cache(64)
-def split_sequence(
-    sequence,
-    look_back,
-    padding_between_lookback_forecast,
-    forecast_horizon,
-    labels_input_measurements,
-    labels_input_forecasts,
-    labels_output,
-):
-    X_measurements, X_forecasts, y = list(), list(), list()
-    for i in range(len(sequence)):
-        lag_end = i + look_back
-        forecast_end = (
-            lag_end + forecast_horizon
-        )
-        if forecast_end > len(sequence):
-            break
-        seq_x_measurements, seq_x_forecasts, seq_y = (
-            sequence[i:lag_end][list(labels_input_measurements)],
-            sequence[i:forecast_end][list(labels_input_forecasts)],
-            sequence[lag_end - 1 + padding_between_lookback_forecast:forecast_end][list(labels_output)],
-        )
-        X_measurements.append(seq_x_measurements)
-        X_forecasts.append(seq_x_forecasts)
-        y.append(seq_y)
-    X_measurements = np.array(X_measurements)
-    X_forecasts = np.array(X_forecasts)
-    X = np.concatenate(X_measurements, X_forecasts, axis=1)
-    return X, np.array(y) # Testar
-
 
 class HashableDataFrame(pd.DataFrame):
     def __init__(self, obj):
@@ -93,7 +60,7 @@ class PersistenciaModel:
             y=self.series_validacao["IRRADIÂNCIA"],
         )
         plt.xlabel("Persistência (W/m²)")
-        plt.ylabel("Alvo (W/m²)")
+        plt.ylabel("Alvo Validação (W/m²)")
         plt.show()
 
     # Scatter plot de Previsões x Target - conjunto de teste
@@ -104,13 +71,13 @@ class PersistenciaModel:
             y=self.series_teste["IRRADIÂNCIA"],
         )
         plt.xlabel("Persistência (W/m²)")
-        plt.ylabel("Alvo (W/m²)")
+        plt.ylabel("Alvo Teste (W/m²)")
         plt.show()
 
     # Plota as previsões vs target de um dos conjuntos
     def plot_line_previsoes_targets(self, series: pd.DataFrame, numero_amostras: int):
         series_filtered = series.tail(numero_amostras)
-        fig, ax = plt.subplots(figsize=(12, 12))
+        fig, ax = plt.subplots(figsize=(18, 12))
         sns.lineplot(y=series_filtered["IRRADIÂNCIA"], x=pd.to_datetime(series_filtered["Data_Horario"]), ax=ax, label="Alvo")
         sns.lineplot(y=series_filtered["previsao_persistencia"], x=pd.to_datetime(series_filtered["Data_Horario"]), ax=ax, label="Persistência", linestyle='--')
 
@@ -137,9 +104,6 @@ class PersistenciaModel:
 
         # Dropa colunas não utilizadas
         df.drop(["Unnamed: 0"], axis=1, inplace=True)
-
-        # Normalização 
-        label_target = "IRRADIÂNCIA"
 
         # Preparação dos Dados
 
@@ -176,26 +140,9 @@ class PersistenciaModel:
         return mae_validacao, mae_teste, series_persistencia_validacao, series_persistencia_teste
 
     @staticmethod
-    # Calculo MAE previsões
-    # Verificação de Modelo calculando o MAE
-    def calculo_mae(previsoes, targets):
-        total_abs_err = 0
-        amostras_vistas = 0
-        for i in range(len(previsoes)):
-            previsao = previsoes[i]
-            target = targets[i].reshape(-1)
-            total_abs_err += np.sum(np.abs(previsao-target))
-            amostras_vistas += len(previsao)
-
-        return total_abs_err / amostras_vistas
-
-
-    @staticmethod
     def verificacao_persistencia_mae(
         df: pd.DataFrame, output_label: str
     ):
-        total_abs_err = 0
-        amostras_vistas = 0
         df_copy = df.copy()
         df_copy["previsao_persistencia"] = df_copy[output_label].shift(24)
         df_copy["erro_persistencia_mod"] = abs(

@@ -8,10 +8,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-from keras import layers, Model
-from typing import Callable, List
+from keras import layers, Model, regularizers
+from typing import Callable, List, Tuple
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 import logging
+import gc
 
 BASE_DIR = "/home/b-rbmp-ideapad/Documents/GitHub/ml-solar-forecaster/"
 LSTM_MODELS_DIR = BASE_DIR + "desenvolvimento_modelos/neural_networks/models"
@@ -44,7 +45,11 @@ def split_sequence(
         y.append(seq_y)
     X_measurements = np.array(X_measurements)
     X_forecasts = np.array(X_forecasts)
-    X = np.concatenate(X_measurements, X_forecasts, axis=1)
+    X_array = np.full((X_measurements.shape[0], max(X_measurements.shape[1], X_forecasts.shape[1]), (X_measurements.shape[2]+X_forecasts.shape[2])), -1, dtype=np.float64)
+    X_array[:, :, :-1] = X_forecasts
+    X_array[:, :X_measurements.shape[1], X_array.shape[2]-X_measurements.shape[2]:] = X_measurements
+    X = np.array(X_array)
+
     return X, np.array(y) # Testar
 
 
@@ -65,10 +70,10 @@ def create_logger(debug_mode: bool):
     logging_level: int
     handler: logging.FileHandler
     if not debug_mode:
-        handler = logging.FileHandler('lstm.log')
+        handler = logging.FileHandler('lstm_nasa_inmet.log')
         logging_level = logging.INFO
     else:
-        handler = logging.FileHandler('lstm.debug')
+        handler = logging.FileHandler('lstm_nasa_inmet.debug')
         logging_level = logging.DEBUG
 
     formatter = logging.Formatter(fmt='%(asctime)s - %(levelname)s - %(message)s', datefmt='%d-%m-%Y %H:%M:%S')
@@ -80,29 +85,31 @@ def create_logger(debug_mode: bool):
     return logger
 
 def vanilla_lstm_model(
-    look_back: int, n_features: int, forecast_range: int
+    look_back: int, n_features_measurements: int, n_features_forecast: int, forecast_range: int
 ):
-    inputs = keras.Input(shape=(look_back, n_features))
-    lstm1 = layers.LSTM(200)(inputs)
-    dropout1 = layers.Dropout(rate=0.15)(lstm1)
+    inputs = keras.Input(shape=(((look_back+forecast_range), (n_features_measurements+n_features_forecast))))
+    mask1 = layers.Masking(mask_value=-1)(inputs)
+    lstm1 = layers.LSTM(200, bias_regularizer=regularizers.L2(1e-3))(mask1)
+    dropout1 = layers.Dropout(rate=0.1)(lstm1)
     dense1 = layers.Dense(100, activation="relu")(dropout1)
-    dropout2 = layers.Dropout(rate=0.15)(dense1)
+    dropout2 = layers.Dropout(rate=0.1)(dense1)
     outputs = layers.Dense(forecast_range)(dropout2)
     model = Model(inputs, outputs)
     return model
 
 
 def encoder_decoder_lstm_model(
-    look_back: int, n_features: int, forecast_range: int
+    look_back: int, n_features_measurements: int, n_features_forecast: int, forecast_range: int
 ):
-    inputs = keras.Input(shape=(look_back, n_features))
-    lstm1 = layers.LSTM(128)(inputs)
-    dropout1 = layers.Dropout(rate=0.15)(lstm1)
+    inputs = keras.Input(shape=(((look_back+forecast_range), (n_features_measurements+n_features_forecast))))
+    mask1 = layers.Masking(mask_value=-1)(inputs)
+    lstm1 = layers.LSTM(128, bias_regularizer=regularizers.L2(1e-3))(mask1)
+    dropout1 = layers.Dropout(rate=0.1)(lstm1)
     repeat_vector = layers.RepeatVector(forecast_range)(dropout1)
-    lstm2 = layers.LSTM(128, return_sequences=True)(repeat_vector)
-    dropout2 = layers.Dropout(rate=0.15)(lstm2)
+    lstm2 = layers.LSTM(128, bias_regularizer=regularizers.L2(1e-3), return_sequences=True)(repeat_vector)
+    dropout2 = layers.Dropout(rate=0.1)(lstm2)
     timedistributed_dense1 = layers.TimeDistributed(layers.Dense(64))(dropout2)
-    timedistributed_dropout1 = layers.TimeDistributed(layers.Dropout(rate=0.15))(timedistributed_dense1)
+    timedistributed_dropout1 = layers.TimeDistributed(layers.Dropout(rate=0.1))(timedistributed_dense1)
     timedistributed_dense2 = layers.TimeDistributed(layers.Dense(1))(timedistributed_dropout1)
     outputs = timedistributed_dense2
     model = Model(inputs, outputs)
@@ -110,19 +117,20 @@ def encoder_decoder_lstm_model(
 
     
 def cnn_lstm_encoder_decoder_model(
-    look_back: int, n_features: int, forecast_range: int
+    look_back: int, n_features_measurements: int, n_features_forecast: int, forecast_range: int
 ):
-    inputs = keras.Input(shape=(look_back, n_features))
-    conv1 = layers.Conv1D(filters=64, kernel_size=9, activation='relu')(inputs)
+    inputs = keras.Input(shape=(((look_back+forecast_range), (n_features_measurements+n_features_forecast))))
+    mask1 = layers.Masking(mask_value=-1)(inputs)
+    conv1 = layers.Conv1D(filters=64, kernel_size=9, activation='relu')(mask1)
     conv2 = layers.Conv1D(filters=64, kernel_size=11, activation='relu')(conv1)
     maxpolling1 = layers.MaxPooling1D(pool_size=2)(conv2)
-    dropout1 = layers.Dropout(rate=0.15)(maxpolling1)
+    dropout1 = layers.Dropout(rate=0.1)(maxpolling1)
     flatten1 = layers.Flatten()(dropout1)
     repeat_vector = layers.RepeatVector(forecast_range)(flatten1)
-    lstm1 = layers.LSTM(128, return_sequences=True)(repeat_vector)
-    dropout2 = layers.Dropout(rate=0.15)(lstm1)
+    lstm1 = layers.LSTM(128, bias_regularizer=regularizers.L2(1e-3), return_sequences=True)(repeat_vector)
+    dropout2 = layers.Dropout(rate=0.1)(lstm1)
     timedistributed_dense1 = layers.TimeDistributed(layers.Dense(64, activation='relu'))(dropout2)
-    timedistributed_dropout1 = layers.TimeDistributed(layers.Dropout(rate=0.15))(timedistributed_dense1)
+    timedistributed_dropout1 = layers.TimeDistributed(layers.Dropout(rate=0.1))(timedistributed_dense1)
     timedistributed_dense2 = layers.TimeDistributed(layers.Dense(1))(timedistributed_dropout1)
     outputs = timedistributed_dense2
     model = Model(inputs, outputs)
@@ -135,16 +143,18 @@ class NeuralTrainingModel:
 
     def __init__(
         self,
+        custom_input_forecast_features: List[str] | None = None,
         train_test_split: List[int] = [60, 20, 20],
-        in_n_measures: int = 168,
+        in_n_measures: int = 24,
         out_n_measures: int = 24,
         sampling_rate: int = 1,
         batch_size: int = 1024,
         learning_rate: float = 1e-3,
-        epochs: int = 500,
+        epochs: int = 5000,
         model_function: Callable = vanilla_lstm_model,
     ):
         self.train_test_split = train_test_split
+        self.custom_input_forecast_features = custom_input_forecast_features
         self.in_n_measures = in_n_measures
         self.out_n_measures = out_n_measures
         self.sampling_rate = sampling_rate
@@ -182,7 +192,7 @@ class NeuralTrainingModel:
         # Separacao das Features que vão até t (todas exceto radiação) e features que vão até t-1 para entrada.
         # Para isso será criado uma nova coluna de radiação que é a radiação atrasada de 1h
         # nome_coluna_radiacao_shifted = "RADIACAO t-1"
-        # df[nome_coluna_radiacao_shifted] = df["IRRADIÂNCIA"].shift(1)
+        # df[nome_coluna_radiacao_shifted] = df["RADIACAO GLOBAL(Kj/m²)"].shift(1)
         # df.fillna(method="bfill", inplace=True)
 
         # Dropa colunas não utilizadas
@@ -206,7 +216,7 @@ class NeuralTrainingModel:
 
         # Normalização 
         label_target = "IRRADIÂNCIA"
-        df_normalizado, scaler = NeuralTrainingModel.normalizacao_stock_dfs(df_target=df, label_target=label_target)
+        df_normalizado, scaler = NeuralTrainingModel.normalizacao_stock_dfs(df_target=df)
 
         # Preparação dos Dados
 
@@ -244,6 +254,9 @@ class NeuralTrainingModel:
             "hora_sin",
         ]
 
+        if self.custom_input_forecast_features is not None:
+            input_features_forecast = self.custom_input_forecast_features
+
         input_measurements = [
             "IRRADIÂNCIA"
         ]
@@ -255,17 +268,18 @@ class NeuralTrainingModel:
         
 
         # Persistência
-        persistencia_validacao = NeuralTrainingModel.verificacao_persistencia_mae(
-            df_validacao, scaler=scaler, output_label=output_features[0]
-        )
-        persistencia_teste = NeuralTrainingModel.verificacao_persistencia_mae(
-            df_teste, scaler=scaler, output_label=output_features[0]
-        )
+        # persistencia_validacao = NeuralTrainingModel.verificacao_persistencia_mae(
+        #     df_validacao, scaler=scaler, output_label=output_features[0]
+        # )
+        # persistencia_teste = NeuralTrainingModel.verificacao_persistencia_mae(
+        #     df_teste, scaler=scaler, output_label=output_features[0]
+        # )
 
         LOOK_BACK = self.in_n_measures
         FORECAST_RANGE = self.out_n_measures
         PADDING_BETWEEN_LOOK_BACK_FORECAST = 1
-        n_features = len(input_features_forecast) + len(input_measurements)
+        n_features_measurements = len(input_measurements)
+        n_features_forecast = len(input_features_forecast)
 
         input_train, output_train = split_sequence(
             HashableDataFrame(df_train),
@@ -295,7 +309,7 @@ class NeuralTrainingModel:
             labels_output=tuple(output_features),
         )
 
-        modelo: Model = self.model_function(LOOK_BACK, n_features, FORECAST_RANGE)
+        modelo: Model = self.model_function(LOOK_BACK, n_features_measurements, n_features_forecast, FORECAST_RANGE)
         callbacks = [
                 keras.callbacks.ModelCheckpoint("modelo_lstm.keras", save_best_only=True),
                 keras.callbacks.EarlyStopping(
@@ -311,17 +325,17 @@ class NeuralTrainingModel:
         history = modelo.fit(input_train,
             output_train,
             batch_size=self.batch_size,
-            epochs=200,
+            epochs=self.epochs,
             validation_data=(input_validation, output_validation),
             callbacks=callbacks)
 
 
         MAE_teste = modelo.evaluate(x=input_test, y=output_test, batch_size=self.batch_size)[1]
 
-        mae_transform_scaler_shape_in = np.zeros(shape=[1, 13])
-        mae_transform_scaler_shape_in[0][2] = MAE_teste
+        mae_transform_scaler_shape_in = np.zeros(shape=[1, df.shape[1]])
+        mae_transform_scaler_shape_in[0][-5] = MAE_teste
         MAE_teste_kj = scaler.inverse_transform(mae_transform_scaler_shape_in)
-        MAE_teste_kj = MAE_teste_kj[0][2]
+        MAE_teste_kj = MAE_teste_kj[0][-5]
 
         history_dict = history.history
         loss_values = history_dict["loss"][5:]
@@ -332,7 +346,7 @@ class NeuralTrainingModel:
 
     # Standardization / Normalization
     @staticmethod
-    def normalizacao_stock_dfs(df_target: pd.DataFrame, normalizacao_or_standardizacao: str = "normalizacao", label_target: str | None = "IRRADIÂNCIA") -> Tuple[pd.DataFrame, MinMaxScaler | StandardScaler | None]:
+    def normalizacao_stock_dfs(df_target: pd.DataFrame, normalizacao_or_standardizacao: str = "normalizacao", label_target: str | None = "RADIACAO GLOBAL(Kj/m²)") -> Tuple[pd.DataFrame, MinMaxScaler | StandardScaler | None]:
         scaler: MinMaxScaler | StandardScaler | None
         if normalizacao_or_standardizacao == 'normalizacao':
             scaler = MinMaxScaler()
@@ -342,20 +356,16 @@ class NeuralTrainingModel:
         
         df_copy = df_target.copy()
 
-        # Não normaliza o target
-        if label_target is not None:
-            df_target = df_copy[label_target]
+
         df_index = df_copy.index
         df_copy.replace(-np.inf, 0, inplace=True)
         df_copy.replace(np.inf, 0, inplace=True)
-        df_copy.drop(labels=[label_target], axis=1, inplace=True)
+
         df_labels = df_copy.columns
 
         df_copy = scaler.fit_transform(df_copy)
         df_copy = pd.DataFrame(data=df_copy, columns=df_labels, index=df_index)
         
-        if label_target is not None:
-            df_copy[label_target] = df_target
         df_copy.dropna(inplace=True)
 
         df_copy[df_copy.select_dtypes(np.float64).columns] = df_copy.select_dtypes(np.float64).astype(np.float32)
@@ -377,26 +387,26 @@ class NeuralTrainingModel:
         return total_abs_err / amostras_vistas
 
 
-    @staticmethod
-    def verificacao_persistencia_mae(
-        df: pd.DataFrame, scaler: MinMaxScaler, output_label: str
-    ):
-        total_abs_err = 0
-        amostras_vistas = 0
-        df_copy = df.copy()
-        index = df_copy.index
-        columns = df_copy.columns
-        unscaled_data = scaler.inverse_transform(df_copy)
-        df_copy = pd.DataFrame(unscaled_data, index=index, columns=columns)
-        df_copy["previsao_persistencia"] = df_copy[output_label].shift(24)
-        df_copy["erro_persistencia_mod"] = abs(
-            df_copy["previsao_persistencia"] - df_copy[output_label]
-        )
-        df_copy_without_nan = df_copy.dropna()
-        mae = df_copy["erro_persistencia_mod"].mean(axis=0, skipna=True)
+    # @staticmethod
+    # def verificacao_persistencia_mae(
+    #     df: pd.DataFrame, scaler: MinMaxScaler, output_label: str
+    # ):
+    #     total_abs_err = 0
+    #     amostras_vistas = 0
+    #     df_copy = df.copy()
+    #     index = df_copy.index
+    #     columns = df_copy.columns
+    #     unscaled_data = scaler.inverse_transform(df_copy)
+    #     df_copy = pd.DataFrame(unscaled_data, index=index, columns=columns)
+    #     df_copy["previsao_persistencia"] = df_copy[output_label].shift(24)
+    #     df_copy["erro_persistencia_mod"] = abs(
+    #         df_copy["previsao_persistencia"] - df_copy[output_label]
+    #     )
+    #     df_copy_without_nan = df_copy.dropna()
+    #     mae = df_copy["erro_persistencia_mod"].mean(axis=0, skipna=True)
 
-        df_series_targets = df_copy_without_nan[["previsao_persistencia", output_label]]
-        return mae, df_series_targets
+    #     df_series_targets = df_copy_without_nan[["previsao_persistencia", output_label]]
+    #     return mae, df_series_targets
 
     @staticmethod
     def evaluate_forecast(y_test_inverse, yhat_inverse):
@@ -413,15 +423,36 @@ class NeuralTrainingModel:
 LOGGER = create_logger(debug_mode=False)
 
 
+# Construção de Inputs (Feature Selection)
+input_forecast_features = [
+    "ano_cos",
+    "ano_sin",
+    "hora_cos",
+    "hora_sin",
+    "RH2M",
+    "WD50M",
+    "PSC",
+]
+
+input_features_faltantes = [
+    "PRECTOTCORR",
+    "WD10M",
+    "T2M",
+    "T2MDEW",
+    "T2MWET",
+    "WS50M",
+    "WS10M",
+] 
+
 
 LOGGER.info(f"Iniciando Treinamentos")
-treinamento_object_vanilla_label = NeuralTrainingModel(model_function=vanilla_lstm_model)
+treinamento_object_vanilla_label = NeuralTrainingModel(model_function=vanilla_lstm_model, custom_input_forecast_features=input_forecast_features)
 LOGGER.info(f'VANILLA: {treinamento_object_vanilla_label.mae_teste_kj}')
-treinamento_object_encoder_decoder_label = NeuralTrainingModel(model_function=encoder_decoder_lstm_model)
+treinamento_object_encoder_decoder_label = NeuralTrainingModel(model_function=encoder_decoder_lstm_model, custom_input_forecast_features=input_forecast_features)
 LOGGER.info(f'ENCODER_DECODER: {treinamento_object_encoder_decoder_label.mae_teste_kj}')
-treinamento_object_cnn_lstm_label = NeuralTrainingModel(model_function=cnn_lstm_encoder_decoder_model)
+treinamento_object_cnn_lstm_label = NeuralTrainingModel(model_function=cnn_lstm_encoder_decoder_model, custom_input_forecast_features=input_forecast_features)
 LOGGER.info(f'CNN_LSTM: {treinamento_object_cnn_lstm_label.mae_teste_kj}')
-print("----")
+
 
 print("FIM")
 

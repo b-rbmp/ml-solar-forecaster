@@ -8,7 +8,7 @@ from typing import List, Tuple
 import logging
 import seaborn as sns
 import matplotlib.dates as mdates
-import scipy as sp
+from sklearn.metrics import r2_score
 
 BASE_DIR = "/home/b-rbmp-ideapad/Documents/GitHub/ml-solar-forecaster/"
 
@@ -161,13 +161,13 @@ persistencia_model_object.plot_scatter_previsoes_targets_teste()
 persistencia_model_object.plot_scatter_previsoes_targets_validacao()
 persistencia_model_object.plot_line_previsoes_targets(series=persistencia_model_object.series_teste, numero_amostras=120)
 
-r_validacao, p_validacao = sp.stats.pearsonr(persistencia_model_object.series_validacao["previsao_persistencia"], persistencia_model_object.series_validacao["IRRADIÂNCIA"])
-r_teste, p_teste = sp.stats.pearsonr(persistencia_model_object.series_teste["previsao_persistencia"], persistencia_model_object.series_teste["IRRADIÂNCIA"])
+R2_validacao = r2_score(y_pred=persistencia_model_object.series_validacao["previsao_persistencia"], y_true=persistencia_model_object.series_validacao["IRRADIÂNCIA"])
+R2_teste = r2_score(y_pred=persistencia_model_object.series_teste["previsao_persistencia"], y_true=persistencia_model_object.series_teste["IRRADIÂNCIA"])
 
 LOGGER = create_logger(debug_mode=False)
 LOGGER.info(f"Iniciando Persistencia")
 LOGGER.info(f'MAE Validação: {persistencia_model_object.mae_validacao} | MAE Teste: {persistencia_model_object.mae_teste}')
-LOGGER.info(f'r_pearson Validação: {r_validacao} | r_pearson Teste: {r_teste}')
+LOGGER.info(f'R2 Validação: {R2_validacao} | r_pearson Teste: {R2_teste}')
 
 print("----")
 

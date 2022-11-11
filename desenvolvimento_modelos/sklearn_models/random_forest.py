@@ -10,7 +10,7 @@ import pandas as pd
 from dataclasses import dataclass, field
 from pandas.util import hash_pandas_object
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
@@ -40,6 +40,7 @@ class RegressorStepModel:
     regressor: RandomForestRegressor
     mae: float
     mse: float
+    r2: float
 
     def __post_init__(self):
         # sort by step
@@ -189,8 +190,9 @@ class RFSolarRegressor:
             Y_pred = regressor.predict(X_test)
             mae = mean_absolute_error(y_true=Y_test, y_pred=Y_pred)
             mse = mean_squared_error(y_true=Y_test, y_pred=Y_pred)
+            r2 = r2_score(y_true=Y_test, y_pred=Y_pred)
 
-            regressor_step_model = RegressorStepModel(step=step, regressor=regressor, mae=mae, mse=mse)
+            regressor_step_model = RegressorStepModel(step=step, regressor=regressor, mae=mae, mse=mse, r2=r2)
 
             filename = f'{step}h.rfmodel'
             pickle.dump(regressor_step_model, open(RF_MODELS_DIR + filename, 'wb'))
@@ -244,72 +246,83 @@ def load_all_rf_models() -> List[RegressorStepModel]:
 LOGGER = create_logger(debug_mode=False)
 
 # Treinamento
-features = [
-    "ano_cos",
-    "ano_sin",
-    "hora_cos",
-    "hora_sin",
-    "RH2M",
-    "WD50M",
-    "PRECTOTCORR",
-    "T2M",
-    "WD10M",
-    "WS50M",
-    "PSC",
-    "T2MWET",
-    "T2MDEW",
-]
-features_a_adicionar = [
-    "WS10M",
-]
-for custom_input_feature in features_a_adicionar:
-    features_nova = features.copy()
-    features_nova.append(custom_input_feature)
-    treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.3, in_n_measures=24, out_n_measures=24, n_estimators=1000, custom_input_features=features_nova)
-    LOGGER.info(f"RESULTADOS PARA: {features_nova}")
-    # Mostrar Resultados
-    models = sorted(load_all_rf_models())
 
-    mae_total = 0.00
-    mse_total = 0.00
-    count = 0
-    for model in models:
-        mae = model.mae
-        mse = model.mse
-        mae_total += mae
-        mse_total += mse
-        count += 1
-        LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse}")
+# Hyperparameter Search
+n_estimators_search = [10, 100, 200, 500, 1000]
 
-    mae_global = mae_total/count
-    mse_global = mse_total/count
-    LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global}")
+
+# Testes de Inclusão de Features
+# features = [
+#     "ano_cos",
+#     "ano_sin",
+#     "hora_cos",
+#     "hora_sin",
+#     "RH2M",
+#     "WD50M",
+#     "PRECTOTCORR",
+#     "T2M",
+#     "WD10M",
+#     "WS50M",
+#     "PSC",
+#     "T2MWET",
+#     "T2MDEW",
+# ]
+# features_a_adicionar = [
+#     "WS10M",
+# ]
+
+# for custom_input_feature in features_a_adicionar:
+#     features_nova = features.copy()
+#     features_nova.append(custom_input_feature)
+#     treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.3, in_n_measures=24, out_n_measures=24, n_estimators=1000, custom_input_features=features_nova)
+#     LOGGER.info(f"RESULTADOS PARA: {features_nova}")
+#     # Mostrar Resultados
+#     models = sorted(load_all_rf_models())
+
+#     mae_total = 0.00
+#     mse_total = 0.00
+#     count = 0
+#     for model in models:
+#         mae = model.mae
+#         mse = model.mse
+#         mae_total += mae
+#         mse_total += mse
+#         count += 1
+#         LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse}")
+
+#     mae_global = mae_total/count
+#     mse_global = mse_total/count
+#     LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global}")
 
                 
-    del treinamento, models
-    gc.collect()
+#     del treinamento, models
+#     gc.collect()
 
 
 
-# treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.3, in_n_measures=24, out_n_measures=24, n_estimators=1000)
+treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=1000)
 
-# # Mostrar Resultados
-# models = sorted(load_all_rf_models())
+# Mostrar Resultados
+models = sorted(load_all_rf_models())
 
-# mae_total = 0.00
-# mse_total = 0.00
-# count = 0
-# for model in models:
-#     mae = model.mae
-#     mse = model.mse
-#     mae_total += mae
-#     mse_total += mse
-#     count += 1
-#     LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse}")
+mae_total = 0.00
+mse_total = 0.00
+r2_total = 0.00
+count = 0
+for model in models:
+    mae = model.mae
+    mse = model.mse
+    r2 = model.r2
+    mae_total += mae
+    mse_total += mse
+    r2_total += r2
+    count += 1
+    LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
 
-# mae_global = mae_total/count
-# mse_global = mse_total/count
-# LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global}")
+mae_global = mae_total/count
+mse_global = mse_total/count
+r2_global = r2_total/count
+LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
 
 
 

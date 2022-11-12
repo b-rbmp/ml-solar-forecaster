@@ -4,6 +4,7 @@ from hashlib import sha256
 import logging
 import os
 import pickle
+import math
 from typing import List, Tuple
 import numpy as np
 import pandas as pd
@@ -105,15 +106,15 @@ def create_logger(debug_mode: bool):
 
 
 class SVRSolarRegressor:
-    def __init__(self, target_local: str = "salvador", train_test_split_ratio: float = 0.7, in_n_measures: int = 168, out_n_measures: int = 24):
+    def __init__(self, target_local: str = "salvador", train_test_split_ratio: float = 0.2, in_n_measures: int = 168, out_n_measures: int = 24, kernel="rbf", c=1.0, gamma="scale", modo_otimizacao=False):
         self.target_local = target_local
         self.in_n_measures = in_n_measures
         self.out_n_measures = out_n_measures
         self.train_test_split = train_test_split_ratio
-        self.rodar_instancia_treinamento(target_local=target_local, train_test_split_ratio=train_test_split_ratio, in_n_measures=in_n_measures, out_n_measures=out_n_measures)
+        self.rodar_instancia_treinamento(target_local=target_local, train_test_split_ratio=train_test_split_ratio, in_n_measures=in_n_measures, out_n_measures=out_n_measures, kernel=kernel, c=c, gamma=gamma, modo_otimizacao=modo_otimizacao)
 
     # Funcao que roda uma instãncia de treinamento e retorna o scaler,
-    def rodar_instancia_treinamento(self, target_local: str = "salvador", train_test_split_ratio: float = 0.7, in_n_measures: int = 168, out_n_measures: int = 24):
+    def rodar_instancia_treinamento(self, target_local: str = "salvador", train_test_split_ratio: float = 0.2, in_n_measures: int = 168, out_n_measures: int = 24, kernel="rbf", c=1.0, gamma="scale", modo_otimizacao=False):
 
         # Download dos dados de treinamento
         df_target = pd.read_csv(f"{BASE_DIR}dados/pre_processado/{target_local}.csv")
@@ -172,12 +173,14 @@ class SVRSolarRegressor:
         data_multioutput_supervised = gerar_dados_problema_supervisionado(forecast_data=HashableDataFrame(df_target_normalized[input_features_forecast]), measurements_data=HashableDataFrame(df_target_normalized[input_measurements]), output_data=HashableDataFrame(df_target_normalized.iloc[in_n_measures:][output_features]), n_in=in_n_measures, n_out=out_n_measures)
 
         target_output_after_treatment = "IRRADIÂNCIA TARGET"
-        for i in range(0, len(data_multioutput_supervised)):
+        range_models = range(0, len(data_multioutput_supervised)) if not modo_otimizacao else range(0, len(data_multioutput_supervised), math.floor(0.25*len(data_multioutput_supervised)))
+
+        for i in range_models:
             step = i + 1
             df_data = data_multioutput_supervised[i]
             X_train, X_test, Y_train, Y_test = train_test_split(df_data.drop(labels=[target_output_after_treatment], axis=1, inplace=False), df_data[target_output_after_treatment], test_size=train_test_split_ratio, random_state=43, shuffle=False)
             
-            regressor = SVR(kernel="rbf", tol=1e-3, C=1.0, epsilon=0.1, shrinking=True, cache_size=1000, verbose=True, max_iter=-1)
+            regressor = SVR(kernel=kernel, tol=1e-4, C=c, gamma=gamma, epsilon=0.1, shrinking=True, cache_size=1000, verbose=True, max_iter=-1)
             regressor.fit(X_train, Y_train)
 
             Y_pred = regressor.predict(X_test)
@@ -238,30 +241,121 @@ def load_all_svr_models() -> List[SVRStepModel]:
 
 LOGGER = create_logger(debug_mode=False)
 
+
+# Hyperparameter Search
+kernel_search = ['linear', 'poly', 'rbf', 'sigmoid']
+c_search = [0.1, 0.5, 1, 2, 5, 10]
+gamma_search = ["auto", "scale", 1, 0.1, 0.01, 0.001]
+
+for kernel in kernel_search:
+    treinamento = SVRSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, kernel=kernel, modo_otimizacao=True)
+    LOGGER.info(f"RESULTADOS PARA kernel={kernel}")
+    # Mostrar Resultados
+    models = sorted(load_all_svr_models())
+
+    mae_total = 0.00
+    mse_total = 0.00
+    r2_total = 0.00
+    count = 0
+    for model in models:
+        mae = model.mae
+        mse = model.mse
+        r2 = model.r2
+        mae_total += mae
+        mse_total += mse
+        r2_total += r2
+        count += 1
+        LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+
+    mae_global = mae_total/count
+    mse_global = mse_total/count
+    r2_global = r2_total/count
+    LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+    del treinamento, models
+    gc.collect()
+
+# kernel_final="rbf"
+# for c in c_search:
+#     treinamento = SVRSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, kernel=kernel_final, c=c, modo_otimizacao=True)
+#     LOGGER.info(f"RESULTADOS PARA c={c}")
+#     # Mostrar Resultados
+#     models = sorted(load_all_svr_models())
+
+#     mae_total = 0.00
+#     mse_total = 0.00
+#     r2_total = 0.00
+#     count = 0
+#     for model in models:
+#         mae = model.mae
+#         mse = model.mse
+#         r2 = model.r2
+#         mae_total += mae
+#         mse_total += mse
+#         r2_total += r2
+#         count += 1
+#         LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+
+#     mae_global = mae_total/count
+#     mse_global = mse_total/count
+#     r2_global = r2_total/count
+#     LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+#     del treinamento, models
+#     gc.collect()
+
+# c_final=1.0
+# for gamma in gamma_search:
+#     treinamento = SVRSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, kernel=kernel_final, c=c_final, gamma=gamma, modo_otimizacao=True)
+#     LOGGER.info(f"RESULTADOS PARA c={c}")
+#     # Mostrar Resultados
+#     models = sorted(load_all_svr_models())
+
+#     mae_total = 0.00
+#     mse_total = 0.00
+#     r2_total = 0.00
+#     count = 0
+#     for model in models:
+#         mae = model.mae
+#         mse = model.mse
+#         r2 = model.r2
+#         mae_total += mae
+#         mse_total += mse
+#         r2_total += r2
+#         count += 1
+#         LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+
+#     mae_global = mae_total/count
+#     mse_global = mse_total/count
+#     r2_global = r2_total/count
+#     LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+#     del treinamento, models
+#     gc.collect()
+
+# gamma_final="scale"
+
 # Treinamento
-#treinamento = SVRSolarRegressor(target_local="salvador", train_test_split_ratio=0.3, in_n_measures=24, out_n_measures=24)
+#treinamento = SVRSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, kernel=kernel_final, c=c_final, gamma=gamma, modo_otimizacao=False)
 
 # Mostrar Resultados
-models = sorted(load_all_svr_models())
+# models = sorted(load_all_svr_models())
 
-mae_total = 0.00
-mse_total = 0.00
-r2_total = 0.00
-count = 0
-for model in models:
-    mae = model.mae
-    mse = model.mse
-    r2 = model.r2
-    mae_total += mae
-    mse_total += mse
-    r2_total += r2
-    count += 1
-    LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+# mae_total = 0.00
+# mse_total = 0.00
+# r2_total = 0.00
+# count = 0
+# for model in models:
+#     mae = model.mae
+#     mse = model.mse
+#     r2 = model.r2
+#     mae_total += mae
+#     mse_total += mse
+#     r2_total += r2
+#     count += 1
+#     LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
 
-mae_global = mae_total/count
-mse_global = mse_total/count
-r2_global = r2_total/count
-LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+# mae_global = mae_total/count
+# mse_global = mse_total/count
+# r2_global = r2_total/count
+# LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
 
 
 

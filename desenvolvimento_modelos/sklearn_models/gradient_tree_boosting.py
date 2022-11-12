@@ -7,6 +7,7 @@ import pickle
 from typing import List, Tuple
 import numpy as np
 import pandas as pd
+import math
 from dataclasses import dataclass, field
 from pandas.util import hash_pandas_object
 from sklearn.ensemble import GradientBoostingRegressor
@@ -105,16 +106,16 @@ def create_logger(debug_mode: bool):
 
 
 class GTBSolarRegressor:
-    def __init__(self, target_local: str = "salvador", train_test_split_ratio: float = 0.7, in_n_measures: int = 168, out_n_measures: int = 24, n_estimators: int = 1000):
+    def __init__(self, target_local: str = "salvador", train_test_split_ratio: float = 0.2, in_n_measures: int = 168, out_n_measures: int = 24, n_estimators: int = 1000, loss = 'squared_error', learning_rate=0.1, subsample=1.0, criterion='friedman_mse', max_depth=3, min_samples_split=2, min_samples_leaf=1, max_features=None, modo_otimizacao=False):
         self.target_local = target_local
         self.in_n_measures = in_n_measures
         self.out_n_measures = out_n_measures
         self.train_test_split = train_test_split_ratio
         self.n_estimators = n_estimators
-        self.rodar_instancia_treinamento(target_local=target_local, train_test_split_ratio=train_test_split_ratio, in_n_measures=in_n_measures, out_n_measures=out_n_measures, n_estimators=n_estimators)
+        self.rodar_instancia_treinamento(target_local=target_local, train_test_split_ratio=train_test_split_ratio, in_n_measures=in_n_measures, out_n_measures=out_n_measures, n_estimators=n_estimators, loss=loss, learning_rate=learning_rate, subsample=subsample, criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, max_features=max_features, modo_otimizacao=modo_otimizacao)
 
     # Funcao que roda uma instãncia de treinamento e retorna o scaler,
-    def rodar_instancia_treinamento(self, target_local: str = "salvador", train_test_split_ratio: float = 0.7, in_n_measures: int = 168, out_n_measures: int = 24, n_estimators: int = 1000):
+    def rodar_instancia_treinamento(self, target_local: str = "salvador", train_test_split_ratio: float = 0.2, in_n_measures: int = 168, out_n_measures: int = 24, n_estimators: int = 1000, loss = 'squared_error', learning_rate=0.1, subsample=1.0, criterion='friedman_mse', max_depth=3, min_samples_split=2, min_samples_leaf=1, max_features=None, modo_otimizacao=False):
 
         # Download dos dados de treinamento
         df_target = pd.read_csv(f"{BASE_DIR}dados/pre_processado/{target_local}.csv")
@@ -178,14 +179,16 @@ class GTBSolarRegressor:
         data_multioutput_supervised = gerar_dados_problema_supervisionado(forecast_data=HashableDataFrame(df_target_normalized[input_features_forecast]), measurements_data=HashableDataFrame(df_target_normalized[input_measurements]), output_data=HashableDataFrame(df_target_normalized.iloc[in_n_measures:][output_features]), n_in=in_n_measures, n_out=out_n_measures)
 
         target_output_after_treatment = "IRRADIÂNCIA TARGET"
-        for i in range(0, out_n_measures):
+        range_models = range(0, len(data_multioutput_supervised)) if not modo_otimizacao else range(0, len(data_multioutput_supervised), math.floor(0.25*len(data_multioutput_supervised)))
+
+        for i in range_models:
             step = i + 1
             df_data = data_multioutput_supervised[i]
             X_train, X_test, Y_train, Y_test = train_test_split(df_data.drop(labels=[target_output_after_treatment], axis=1, inplace=False), df_data[target_output_after_treatment], test_size=train_test_split_ratio, random_state=43, shuffle=False)
             del df_data
             gc.collect()
 
-            regressor = GradientBoostingRegressor(loss="squared_error", learning_rate=0.1, criterion="friedman_mse", n_estimators=n_estimators, random_state=43, max_features=max_features, validation_fraction=0.25, n_iter_no_change=50, verbose=1)
+            regressor = GradientBoostingRegressor(loss=loss, learning_rate=learning_rate, subsample=subsample, criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, max_features=max_features, n_estimators=n_estimators, random_state=43, validation_fraction=0.25, n_iter_no_change=50, verbose=1, tol=1e-4)
             regressor.fit(X_train, Y_train)
 
             Y_pred = regressor.predict(X_test)
@@ -249,26 +252,304 @@ def load_all_gtb_models() -> List[RegressorStepModel]:
 
 LOGGER = create_logger(debug_mode=False)
 
-treinamento = GTBSolarRegressor(target_local="salvador", train_test_split_ratio=0.3, in_n_measures=24, out_n_measures=24, n_estimators=1000)
+features_final = [
+    "ano_cos",
+    "ano_sin",
+    "hora_cos",
+    "hora_sin",
+    "RH2M",
+    "WD50M",
+    "PRECTOTCORR",
+    "T2M",
+    "WD10M",
+    "WS50M",
+    "PSC",
+]
+
+# Hyperparameter Search
+n_estimators_search = [10, 100, 1000, 2000, 5000]
+loss_search = ['squared_error', 'absolute_error', 'huber', 'quantile']
+learning_rate_search = [0.01, 0.05, 0.1, 0.2, 0.4, 0.6, 1]
+subsample_search = [0.2, 0.5, 0.8, 1]
+criterion_search = ['friedman_mse', 'squared_error', 'mse']
+max_depth_search = [2, 3, 5, 8, 12, 14]
+min_samples_split_search = [1, 2, 3, 5, 7, 10]
+min_samples_leaf_search = [1, 2, 3, 5, 7, 10]
+max_features_search = ["sqrt", "log2", None]
+
+for n_estimators in n_estimators_search:
+    treinamento = GTBSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimators, custom_input_features=features_final, modo_otimizacao=True)
+    LOGGER.info(f"RESULTADOS PARA n_estimators={n_estimators}")
+    # Mostrar Resultados
+    models = sorted(load_all_gtb_models())
+
+    mae_total = 0.00
+    mse_total = 0.00
+    r2_total = 0.00
+    count = 0
+    for model in models:
+        mae = model.mae
+        mse = model.mse
+        r2 = model.r2
+        mae_total += mae
+        mse_total += mse
+        r2_total += r2
+        count += 1
+        LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+
+    mae_global = mae_total/count
+    mse_global = mse_total/count
+    r2_global = r2_total/count
+    LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+    del treinamento, models
+    gc.collect()
+
+n_estimators_final = 1000
+for loss in loss_search:
+    treinamento = GTBSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimators_final, custom_input_features=features_final, loss=loss, modo_otimizacao=True)
+    LOGGER.info(f"RESULTADOS PARA loss={loss}")
+    # Mostrar Resultados
+    models = sorted(load_all_gtb_models())
+
+    mae_total = 0.00
+    mse_total = 0.00
+    r2_total = 0.00
+    count = 0
+    for model in models:
+        mae = model.mae
+        mse = model.mse
+        r2 = model.r2
+        mae_total += mae
+        mse_total += mse
+        r2_total += r2
+        count += 1
+        LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+
+    mae_global = mae_total/count
+    mse_global = mse_total/count
+    r2_global = r2_total/count
+    LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+    del treinamento, models
+    gc.collect()
 
 
-models = sorted(load_all_gtb_models())
+loss_final = "squared_error"
+for learning_rate in learning_rate_search:
+    treinamento = GTBSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimators_final, custom_input_features=features_final, loss=loss_final, learning_rate=learning_rate, modo_otimizacao=True)
+    LOGGER.info(f"RESULTADOS PARA learning_rate={learning_rate}")
+    # Mostrar Resultados
+    models = sorted(load_all_gtb_models())
 
-mae_total = 0.00
-mse_total = 0.00
-r2_total = 0.00
-count = 0
-for model in models:
-    mae = model.mae
-    mse = model.mse
-    r2 = model.r2
-    mae_total += mae
-    mse_total += mse
-    r2_total += r2
-    count += 1
-    LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+    mae_total = 0.00
+    mse_total = 0.00
+    r2_total = 0.00
+    count = 0
+    for model in models:
+        mae = model.mae
+        mse = model.mse
+        r2 = model.r2
+        mae_total += mae
+        mse_total += mse
+        r2_total += r2
+        count += 1
+        LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
 
-mae_global = mae_total/count
-mse_global = mse_total/count
-r2_global = r2_total/count
-LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+    mae_global = mae_total/count
+    mse_global = mse_total/count
+    r2_global = r2_total/count
+    LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+    del treinamento, models
+    gc.collect()
+
+learning_rate_final = 0.1
+for subsample in subsample_search:
+    treinamento = GTBSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimators_final, custom_input_features=features_final, loss=loss_final, learning_rate=learning_rate_final, subsample=subsample, modo_otimizacao=True)
+    LOGGER.info(f"RESULTADOS PARA subsample={subsample}")
+    # Mostrar Resultados
+    models = sorted(load_all_gtb_models())
+
+    mae_total = 0.00
+    mse_total = 0.00
+    r2_total = 0.00
+    count = 0
+    for model in models:
+        mae = model.mae
+        mse = model.mse
+        r2 = model.r2
+        mae_total += mae
+        mse_total += mse
+        r2_total += r2
+        count += 1
+        LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+
+    mae_global = mae_total/count
+    mse_global = mse_total/count
+    r2_global = r2_total/count
+    LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+    del treinamento, models
+    gc.collect()
+
+subsample_final = 1.0
+for criterion in criterion_search:
+    treinamento = GTBSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimators_final, custom_input_features=features_final, loss=loss_final, learning_rate=learning_rate_final, subsample=subsample_final, criterion=criterion, modo_otimizacao=True)
+    LOGGER.info(f"RESULTADOS PARA criterion={criterion}")
+    # Mostrar Resultados
+    models = sorted(load_all_gtb_models())
+
+    mae_total = 0.00
+    mse_total = 0.00
+    r2_total = 0.00
+    count = 0
+    for model in models:
+        mae = model.mae
+        mse = model.mse
+        r2 = model.r2
+        mae_total += mae
+        mse_total += mse
+        r2_total += r2
+        count += 1
+        LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+
+    mae_global = mae_total/count
+    mse_global = mse_total/count
+    r2_global = r2_total/count
+    LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+    del treinamento, models
+    gc.collect()
+
+criterion_final = "friedman_mse"
+for max_depth in max_depth_search:
+    treinamento = GTBSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimators_final, custom_input_features=features_final, loss=loss_final, learning_rate=learning_rate_final, subsample=subsample_final, criterion=criterion_final, max_depth=max_depth, modo_otimizacao=True)
+    LOGGER.info(f"RESULTADOS PARA max_depth={max_depth}")
+    # Mostrar Resultados
+    models = sorted(load_all_gtb_models())
+
+    mae_total = 0.00
+    mse_total = 0.00
+    r2_total = 0.00
+    count = 0
+    for model in models:
+        mae = model.mae
+        mse = model.mse
+        r2 = model.r2
+        mae_total += mae
+        mse_total += mse
+        r2_total += r2
+        count += 1
+        LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+
+    mae_global = mae_total/count
+    mse_global = mse_total/count
+    r2_global = r2_total/count
+    LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+    del treinamento, models
+    gc.collect()
+
+max_depth_final = 3
+for min_samples_split in min_samples_split_search:
+    treinamento = GTBSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimators_final, custom_input_features=features_final, loss=loss_final, learning_rate=learning_rate_final, subsample=subsample_final, criterion=criterion_final, max_depth=max_depth_final, min_samples_split=min_samples_split, modo_otimizacao=True)
+    LOGGER.info(f"RESULTADOS PARA min_samples_split={min_samples_split}")
+    # Mostrar Resultados
+    models = sorted(load_all_gtb_models())
+
+    mae_total = 0.00
+    mse_total = 0.00
+    r2_total = 0.00
+    count = 0
+    for model in models:
+        mae = model.mae
+        mse = model.mse
+        r2 = model.r2
+        mae_total += mae
+        mse_total += mse
+        r2_total += r2
+        count += 1
+        LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+
+    mae_global = mae_total/count
+    mse_global = mse_total/count
+    r2_global = r2_total/count
+    LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+    del treinamento, models
+    gc.collect()
+
+min_samples_split_final = 2
+for min_samples_leaf in min_samples_leaf_search:
+    treinamento = GTBSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimators_final, custom_input_features=features_final, loss=loss_final, learning_rate=learning_rate_final, subsample=subsample_final, criterion=criterion_final, max_depth=max_depth_final, min_samples_split=min_samples_split_final, min_samples_leaf=min_samples_leaf, modo_otimizacao=True)
+    LOGGER.info(f"RESULTADOS PARA min_samples_leaf={min_samples_leaf}")
+    # Mostrar Resultados
+    models = sorted(load_all_gtb_models())
+
+    mae_total = 0.00
+    mse_total = 0.00
+    r2_total = 0.00
+    count = 0
+    for model in models:
+        mae = model.mae
+        mse = model.mse
+        r2 = model.r2
+        mae_total += mae
+        mse_total += mse
+        r2_total += r2
+        count += 1
+        LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+
+    mae_global = mae_total/count
+    mse_global = mse_total/count
+    r2_global = r2_total/count
+    LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+    del treinamento, models
+    gc.collect()
+
+min_samples_leaf_final = 1
+for max_features in max_features_search:
+    treinamento = GTBSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimators_final, custom_input_features=features_final, loss=loss_final, learning_rate=learning_rate_final, subsample=subsample_final, criterion=criterion_final, max_depth=max_depth_final, min_samples_split=min_samples_split_final, min_samples_leaf=min_samples_leaf_final, max_features=max_features, modo_otimizacao=True)
+    LOGGER.info(f"RESULTADOS PARA max_features={max_features}")
+    # Mostrar Resultados
+    models = sorted(load_all_gtb_models())
+
+    mae_total = 0.00
+    mse_total = 0.00
+    r2_total = 0.00
+    count = 0
+    for model in models:
+        mae = model.mae
+        mse = model.mse
+        r2 = model.r2
+        mae_total += mae
+        mse_total += mse
+        r2_total += r2
+        count += 1
+        LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+
+    mae_global = mae_total/count
+    mse_global = mse_total/count
+    r2_global = r2_total/count
+    LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+    del treinamento, models
+    gc.collect()
+
+#max_features_final = None
+#treinamento = GTBSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, , n_estimators=n_estimators_final, custom_input_features=features_final, loss=loss_final, learning_rate=learning_rate_final, subsample=subsample_final, criterion=criterion_final, max_depth=max_depth_final, min_samples_split=min_samples_split_final, min_samples_leaf=min_samples_leaf_final, max_features=max_features)
+
+# Mostrar Resultados
+# models = sorted(load_all_gtb_models())
+
+# mae_total = 0.00
+# mse_total = 0.00
+# r2_total = 0.00
+# count = 0
+# for model in models:
+#     mae = model.mae
+#     mse = model.mse
+#     r2 = model.r2
+#     mae_total += mae
+#     mse_total += mse
+#     r2_total += r2
+#     count += 1
+#     LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+
+# mae_global = mae_total/count
+# mse_global = mse_total/count
+# r2_global = r2_total/count
+# LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")

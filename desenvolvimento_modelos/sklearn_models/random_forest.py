@@ -313,41 +313,41 @@ features_final = [
 
 # Hyperparameter Search
 n_estimators_search = [10, 100, 1000, 2000, 5000]
-criterion_search = ["squared_error", "absolute_error", "poisson"]
-max_depth_search = [2, 4, 8, 12, 14]
-min_samples_split_search = [1, 2, 3, 5, 7, 10]
-min_samples_leaf_search = [1, 2, 3, 5, 7, 10]
+criterion_search = ["squared_error", "poisson"]
+max_depth_search = [2, 4, 8, 12, 14, 16]
+min_samples_split_search = [2, 3, 5, 7, 10]
+min_samples_leaf_search = [2, 3, 5, 7, 10]
 max_features_search = ["sqrt", "log2", 0,33]
 
-for n_estimator in n_estimators_search:
-    treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator, custom_input_features=features_final, modo_otimizacao=True)
-    LOGGER.info(f"RESULTADOS PARA N_ESTIMATORS={n_estimator}")
-    # Mostrar Resultados
-    models = sorted(load_all_rf_models())
+# for n_estimator in n_estimators_search:
+#     treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator, custom_input_features=features_final, modo_otimizacao=True)
+#     LOGGER.info(f"RESULTADOS PARA N_ESTIMATORS={n_estimator}")
+#     # Mostrar Resultados
+#     models = sorted(load_all_rf_models())
 
-    mae_total = 0.00
-    mse_total = 0.00
-    r2_total = 0.00
-    count = 0
-    for model in models:
-        mae = model.mae
-        mse = model.mse
-        r2 = model.r2
-        mae_total += mae
-        mse_total += mse
-        r2_total += r2
-        count += 1
-        LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+#     mae_total = 0.00
+#     mse_total = 0.00
+#     r2_total = 0.00
+#     count = 0
+#     for model in models:
+#         mae = model.mae
+#         mse = model.mse
+#         r2 = model.r2
+#         mae_total += mae
+#         mse_total += mse
+#         r2_total += r2
+#         count += 1
+#         LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
 
-    mae_global = mae_total/count
-    mse_global = mse_total/count
-    r2_global = r2_total/count
-    LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+#     mae_global = mae_total/count
+#     mse_global = mse_total/count
+#     r2_global = r2_total/count
+#     LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
 
-    del treinamento, models
-    gc.collect()
+#     del treinamento, models
+#     gc.collect()
 
-# n_estimator_final = 1000
+n_estimator_final = 1000
 # for criterion in criterion_search:
 #     treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator_final, custom_input_features=features_final, criterion=criterion, modo_otimizacao=True)
 #     LOGGER.info(f"RESULTADOS PARA criterion={criterion}")
@@ -372,12 +372,12 @@ for n_estimator in n_estimators_search:
 #     mse_global = mse_total/count
 #     r2_global = r2_total/count
 #     LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
-    # del treinamento, models
-    # gc.collect()
+#     del treinamento, models
+#     gc.collect()
 
-# criterion_final = "squared_error"
+criterion_final = "squared_error"
 # for max_depth in max_depth_search:
-#     treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator_final, custom_input_features=features_final, criterion=criterion_final, max_depth_search=max_depth, modo_otimizacao=True)
+#     treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator_final, custom_input_features=features_final, criterion=criterion_final, max_depth=max_depth, modo_otimizacao=True)
 #     LOGGER.info(f"RESULTADOS PARA max_depth={max_depth}")
 #     # Mostrar Resultados
 #     models = sorted(load_all_rf_models())
@@ -400,40 +400,40 @@ for n_estimator in n_estimators_search:
 #     mse_global = mse_total/count
 #     r2_global = r2_total/count
 #     LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
-    # del treinamento, models
-    # gc.collect()
+#     del treinamento, models
+#     gc.collect()
 
-# max_depth_final = 12
-# for min_samples_split in min_samples_split_search:
-#     treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator_final, custom_input_features=features_final, criterion=criterion_final, max_depth_search=max_depth_final, min_samples_split=min_samples_split, modo_otimizacao=True)
-#     LOGGER.info(f"RESULTADOS PARA min_samples_split={min_samples_split}")
-#     # Mostrar Resultados
-#     models = sorted(load_all_rf_models())
+max_depth_final = 12
+for min_samples_split in min_samples_split_search:
+    treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator_final, custom_input_features=features_final, criterion=criterion_final, max_depth=max_depth_final, min_samples_split=min_samples_split, modo_otimizacao=True)
+    LOGGER.info(f"RESULTADOS PARA min_samples_split={min_samples_split}")
+    # Mostrar Resultados
+    models = sorted(load_all_rf_models())
 
-#     mae_total = 0.00
-#     mse_total = 0.00
-#     r2_total = 0.00
-#     count = 0
-#     for model in models:
-#         mae = model.mae
-#         mse = model.mse
-#         r2 = model.r2
-#         mae_total += mae
-#         mse_total += mse
-#         r2_total += r2
-#         count += 1
-#         LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+    mae_total = 0.00
+    mse_total = 0.00
+    r2_total = 0.00
+    count = 0
+    for model in models:
+        mae = model.mae
+        mse = model.mse
+        r2 = model.r2
+        mae_total += mae
+        mse_total += mse
+        r2_total += r2
+        count += 1
+        LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
 
-#     mae_global = mae_total/count
-#     mse_global = mse_total/count
-#     r2_global = r2_total/count
-#     LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
-    # del treinamento, models
-    # gc.collect()
+    mae_global = mae_total/count
+    mse_global = mse_total/count
+    r2_global = r2_total/count
+    LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+    del treinamento, models
+    gc.collect()
 
 # min_samples_split_final = 2
 # for min_samples_leaf in min_samples_leaf_search:
-#     treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator_final, custom_input_features=features_final, criterion=criterion_final, max_depth_search=max_depth_final, min_samples_split=min_samples_split_final, min_samples_leaf=min_samples_leaf, modo_otimizacao=True)
+#     treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator_final, custom_input_features=features_final, criterion=criterion_final, max_depth=max_depth_final, min_samples_split=min_samples_split_final, min_samples_leaf=min_samples_leaf, modo_otimizacao=True)
 #     LOGGER.info(f"RESULTADOS PARA min_samples_leaf={min_samples_leaf}")
 #     # Mostrar Resultados
 #     models = sorted(load_all_rf_models())
@@ -461,7 +461,7 @@ for n_estimator in n_estimators_search:
 
 # min_samples_leaf_final = 1
 # for max_features in max_features_search:
-#     treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator_final, custom_input_features=features_final, criterion=criterion_final, max_depth_search=max_depth_final, min_samples_split=min_samples_split_final, min_samples_leaf=min_samples_leaf_final, max_features=max_features, modo_otimizacao=True)
+#     treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator_final, custom_input_features=features_final, criterion=criterion_final, max_depth=max_depth_final, min_samples_split=min_samples_split_final, min_samples_leaf=min_samples_leaf_final, max_features=max_features, modo_otimizacao=True)
 #     LOGGER.info(f"RESULTADOS PARA max_features={max_features}")
 #     # Mostrar Resultados
 #     models = sorted(load_all_rf_models())
@@ -488,7 +488,7 @@ for n_estimator in n_estimators_search:
     # gc.collect()
 
 #max_features_final = 0.33
-# treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator_final, custom_input_features=features_final, criterion=criterion_final, max_depth_search=max_depth_final, min_samples_split=min_samples_split_final, min_samples_leaf=min_samples_leaf_final, max_features=max_features_final)
+# treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator_final, custom_input_features=features_final, criterion=criterion_final, max_depth=max_depth_final, min_samples_split=min_samples_split_final, min_samples_leaf=min_samples_leaf_final, max_features=max_features_final)
 
 # # Mostrar Resultados
 # models = sorted(load_all_rf_models())

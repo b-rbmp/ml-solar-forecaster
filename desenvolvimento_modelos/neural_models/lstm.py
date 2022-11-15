@@ -16,6 +16,7 @@ from sklearn.metrics import r2_score
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 import logging
 import gc
+import joblib
 
 BASE_DIR = "/home/b-rbmp-ideapad/Documents/GitHub/ml-solar-forecaster/"
 LSTM_MODELS_DIR = BASE_DIR + "desenvolvimento_modelos/neural_models/models/"
@@ -53,7 +54,7 @@ def split_sequence(
     X_array[:, :X_measurements.shape[1], X_array.shape[2]-X_measurements.shape[2]:] = X_measurements
     X = np.array(X_array)
 
-    return X, np.array(y) # Testar
+    return X, np.array(y)
 
 
 class HashableDataFrame(pd.DataFrame):
@@ -347,6 +348,9 @@ class NeuralTrainingModel:
         loss_values = history_dict["loss"][5:]
         val_loss_values = history_dict["val_loss"][5:]
         #forecast_teste = modelo.predict(x=input_test, batch_size=None)
+
+        # Salva o Scaler
+        joblib.dump(scaler, LSTM_MODELS_DIR+arquitetura_str+f"scaler.gz")
         
         return MAE_teste_kj, loss_values, val_loss_values, R2_teste
 

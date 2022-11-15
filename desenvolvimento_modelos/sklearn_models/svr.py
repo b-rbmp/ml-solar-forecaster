@@ -5,7 +5,7 @@ import logging
 import os
 import pickle
 import math
-from typing import List, Tuple
+from typing import List, Tuple, Union
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass, field
@@ -42,6 +42,7 @@ class SVRStepModel:
     mae: float
     mse: float
     r2: float
+    scaler: Union[MinMaxScaler, StandardScaler]
 
     def __post_init__(self):
         # sort by step

@@ -1,10 +1,9 @@
-from functools import lru_cache
 import gc
 from hashlib import sha256
 import logging
 import os
 import pickle
-from typing import List, Tuple
+from typing import List, Tuple, Union
 import numpy as np
 import pandas as pd
 import math
@@ -42,6 +41,7 @@ class RegressorStepModel:
     mae: float
     mse: float
     r2: float
+    scaler: Union[MinMaxScaler, StandardScaler]
 
     def __post_init__(self):
         # sort by step
@@ -194,11 +194,10 @@ class RFSolarRegressor:
             mse = mean_squared_error(y_true=Y_test, y_pred=Y_pred)
             r2 = r2_score(y_true=Y_test, y_pred=Y_pred)
 
-            regressor_step_model = RegressorStepModel(step=step, regressor=regressor, mae=mae, mse=mse, r2=r2)
+            regressor_step_model = RegressorStepModel(step=step, regressor=regressor, mae=mae, mse=mse, r2=r2, scaler=scaler)
 
             filename = f'{step}h.rfmodel'
             pickle.dump(regressor_step_model, open(RF_MODELS_DIR + filename, 'wb'))
-            
             del regressor, regressor_step_model
             gc.collect()
     
@@ -315,9 +314,9 @@ features_final = [
 n_estimators_search = [10, 100, 1000, 2000, 5000]
 criterion_search = ["squared_error", "poisson"]
 max_depth_search = [2, 4, 8, 12, 14, 16]
-min_samples_split_search = [2, 3, 5, 7, 10]
-min_samples_leaf_search = [2, 3, 5, 7, 10]
-max_features_search = ["sqrt", "log2", 0,33]
+min_samples_split_search = [2, 3, 5, 7]
+min_samples_leaf_search = [2, 3, 5, 7]
+max_features_search = ["sqrt", "log2", 0.33]
 
 # for n_estimator in n_estimators_search:
 #     treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator, custom_input_features=features_final, modo_otimizacao=True)
@@ -404,34 +403,34 @@ criterion_final = "squared_error"
 #     gc.collect()
 
 max_depth_final = 12
-for min_samples_split in min_samples_split_search:
-    treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator_final, custom_input_features=features_final, criterion=criterion_final, max_depth=max_depth_final, min_samples_split=min_samples_split, modo_otimizacao=True)
-    LOGGER.info(f"RESULTADOS PARA min_samples_split={min_samples_split}")
-    # Mostrar Resultados
-    models = sorted(load_all_rf_models())
+# for min_samples_split in min_samples_split_search:
+#     treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator_final, custom_input_features=features_final, criterion=criterion_final, max_depth=max_depth_final, min_samples_split=min_samples_split, modo_otimizacao=True)
+#     LOGGER.info(f"RESULTADOS PARA min_samples_split={min_samples_split}")
+#     # Mostrar Resultados
+#     models = sorted(load_all_rf_models())
 
-    mae_total = 0.00
-    mse_total = 0.00
-    r2_total = 0.00
-    count = 0
-    for model in models:
-        mae = model.mae
-        mse = model.mse
-        r2 = model.r2
-        mae_total += mae
-        mse_total += mse
-        r2_total += r2
-        count += 1
-        LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+#     mae_total = 0.00
+#     mse_total = 0.00
+#     r2_total = 0.00
+#     count = 0
+#     for model in models:
+#         mae = model.mae
+#         mse = model.mse
+#         r2 = model.r2
+#         mae_total += mae
+#         mse_total += mse
+#         r2_total += r2
+#         count += 1
+#         LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
 
-    mae_global = mae_total/count
-    mse_global = mse_total/count
-    r2_global = r2_total/count
-    LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
-    del treinamento, models
-    gc.collect()
+#     mae_global = mae_total/count
+#     mse_global = mse_total/count
+#     r2_global = r2_total/count
+#     LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+#     del treinamento, models
+#     gc.collect()
 
-# min_samples_split_final = 2
+min_samples_split_final = 2
 # for min_samples_leaf in min_samples_leaf_search:
 #     treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator_final, custom_input_features=features_final, criterion=criterion_final, max_depth=max_depth_final, min_samples_split=min_samples_split_final, min_samples_leaf=min_samples_leaf, modo_otimizacao=True)
 #     LOGGER.info(f"RESULTADOS PARA min_samples_leaf={min_samples_leaf}")
@@ -456,10 +455,10 @@ for min_samples_split in min_samples_split_search:
 #     mse_global = mse_total/count
 #     r2_global = r2_total/count
 #     LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
-    # del treinamento, models
-    # gc.collect()
+#     del treinamento, models
+#     gc.collect()
 
-# min_samples_leaf_final = 1
+min_samples_leaf_final = 7
 # for max_features in max_features_search:
 #     treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator_final, custom_input_features=features_final, criterion=criterion_final, max_depth=max_depth_final, min_samples_split=min_samples_split_final, min_samples_leaf=min_samples_leaf_final, max_features=max_features, modo_otimizacao=True)
 #     LOGGER.info(f"RESULTADOS PARA max_features={max_features}")
@@ -484,33 +483,33 @@ for min_samples_split in min_samples_split_search:
 #     mse_global = mse_total/count
 #     r2_global = r2_total/count
 #     LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
-    # del treinamento, models
-    # gc.collect()
+#     del treinamento, models
+#     gc.collect()
 
-#max_features_final = 0.33
-# treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator_final, custom_input_features=features_final, criterion=criterion_final, max_depth=max_depth_final, min_samples_split=min_samples_split_final, min_samples_leaf=min_samples_leaf_final, max_features=max_features_final)
+max_features_final = 0.33
+treinamento = RFSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, n_estimators=n_estimator_final, custom_input_features=features_final, criterion=criterion_final, max_depth=max_depth_final, min_samples_split=min_samples_split_final, min_samples_leaf=min_samples_leaf_final, max_features=max_features_final)
 
 # # Mostrar Resultados
-# models = sorted(load_all_rf_models())
+models = sorted(load_all_rf_models())
 
-# mae_total = 0.00
-# mse_total = 0.00
-# r2_total = 0.00
-# count = 0
-# for model in models:
-#     mae = model.mae
-#     mse = model.mse
-#     r2 = model.r2
-#     mae_total += mae
-#     mse_total += mse
-#     r2_total += r2
-#     count += 1
-#     LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
+mae_total = 0.00
+mse_total = 0.00
+r2_total = 0.00
+count = 0
+for model in models:
+    mae = model.mae
+    mse = model.mse
+    r2 = model.r2
+    mae_total += mae
+    mse_total += mse
+    r2_total += r2
+    count += 1
+    LOGGER.info(f"STEP: {model.step}h | mae: {mae} | mse: {mse} | R2: {r2}")
 
-# mae_global = mae_total/count
-# mse_global = mse_total/count
-# r2_global = r2_total/count
-# LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
+mae_global = mae_total/count
+mse_global = mse_total/count
+r2_global = r2_total/count
+LOGGER.info(f"TOTAL => mae: {mae_global} | mse: {mse_global} | R2: {r2_global}")
 
 
 

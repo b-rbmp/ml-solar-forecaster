@@ -184,6 +184,7 @@ class GTBSolarRegressor:
 
         target_output_after_treatment = "IRRADIÂNCIA TARGET"
         range_models = range(0, len(data_multioutput_supervised)) if not modo_otimizacao else range(0, len(data_multioutput_supervised), math.floor(0.30*len(data_multioutput_supervised)))
+        range_models = range(19, 24)
         for i in range_models:
             step = i + 1
             df_data = data_multioutput_supervised[i]

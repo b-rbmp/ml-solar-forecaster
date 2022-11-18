@@ -1,8 +1,0 @@
-12-11-2022 21:56:46 - INFO - Iniciando Treinamentos
-12-11-2022 22:16:01 - INFO - Iniciando Treinamentos
-13-11-2022 19:41:48 - INFO - Iniciando Otimização de Hiperparâmetros
-13-11-2022 19:41:48 - INFO - Otimizador: <keras.optimizers.optimizer_v2.adam.Adam object at 0x7f9a6a5ba260>
-13-11-2022 20:23:25 - INFO - Iniciando Otimização de Hiperparâmetros
-13-11-2022 20:23:25 - INFO - Otimizador: <keras.optimizers.optimizer_v2.adam.Adam object at 0x7f90e7fce260>
-13-11-2022 20:27:33 - INFO - Iniciando Otimização de Hiperparâmetros
-13-11-2022 20:27:33 - INFO - Otimizador: <keras.optimizers.optimizer_v2.adam.Adam object at 0x7f2e1a1c2260>

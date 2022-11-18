@@ -108,15 +108,15 @@ def create_logger(debug_mode: bool):
 
 
 class SVRSolarRegressor:
-    def __init__(self, target_local: str = "salvador", train_test_split_ratio: float = 0.2, in_n_measures: int = 168, out_n_measures: int = 24, kernel="rbf", c=1.0, gamma="scale", modo_otimizacao=False):
+    def __init__(self, target_local: str = "salvador", train_test_split_ratio: float = 0.2, in_n_measures: int = 168, out_n_measures: int = 24, kernel="rbf", c=1.0, gamma="scale", modo_otimizacao=False, custom_input_features: List[str] = []):
         self.target_local = target_local
         self.in_n_measures = in_n_measures
         self.out_n_measures = out_n_measures
         self.train_test_split = train_test_split_ratio
-        self.rodar_instancia_treinamento(target_local=target_local, train_test_split_ratio=train_test_split_ratio, in_n_measures=in_n_measures, out_n_measures=out_n_measures, kernel=kernel, c=c, gamma=gamma, modo_otimizacao=modo_otimizacao)
+        self.rodar_instancia_treinamento(target_local=target_local, train_test_split_ratio=train_test_split_ratio, in_n_measures=in_n_measures, out_n_measures=out_n_measures, kernel=kernel, c=c, gamma=gamma, modo_otimizacao=modo_otimizacao, custom_input_features=custom_input_features)
 
     # Funcao que roda uma instãncia de treinamento e retorna o scaler,
-    def rodar_instancia_treinamento(self, target_local: str = "salvador", train_test_split_ratio: float = 0.2, in_n_measures: int = 168, out_n_measures: int = 24, kernel="rbf", c=1.0, gamma="scale", modo_otimizacao=False):
+    def rodar_instancia_treinamento(self, target_local: str = "salvador", train_test_split_ratio: float = 0.2, in_n_measures: int = 168, out_n_measures: int = 24, kernel="rbf", c=1.0, gamma="scale", modo_otimizacao=False, custom_input_features: List[str] = []):
 
         # Download dos dados de treinamento
         df_target = pd.read_csv(f"{BASE_DIR}dados/pre_processado/{target_local}.csv")
@@ -148,26 +148,32 @@ class SVRSolarRegressor:
         df_target_normalized, scaler = SVRSolarRegressor.normalizacao_stock_dfs(df_target=df_target, label_target=label_target)
 
         # Features Entrada
-        input_features_forecast = [
-            "T2M",
-            "T2MDEW",
-            "T2MWET",
-            "RH2M",
-            "PRECTOTCORR",
-            "WD10M",
-            "WS10M",
-            "WS50M",
-            "WD50M",
-            "PSC",
-            "ano_cos",
-            "ano_sin",
-            "hora_cos",
-            "hora_sin",
-        ]
+        if len(custom_input_features) > 0:
+            input_features_forecast = custom_input_features
+        else:
+            input_features_forecast = [
+                "T2M",
+                "T2MDEW",
+                "T2MWET",
+                "RH2M",
+                "PRECTOTCORR",
+                "WD10M",
+                "WS10M",
+                "WS50M",
+                "WD50M",
+                "PSC",
+                "ano_cos",
+                "ano_sin",
+                "hora_cos",
+                "hora_sin",
+            ]
 
         input_measurements = [
             "IRRADIÂNCIA"
         ]
+
+        # Features Saida
+        output_features = ["IRRADIÂNCIA"]
 
         # Features Saida
         output_features = ["IRRADIÂNCIA"]
@@ -245,6 +251,19 @@ LOGGER = create_logger(debug_mode=False)
  
 
 # Hyperparameter Search
+features_final = [
+    "ano_cos",
+    "ano_sin",
+    "hora_cos",
+    "hora_sin",
+    "RH2M",
+    "WD50M",
+    "PRECTOTCORR",
+    "T2M",
+    "WD10M",
+    "WS50M",
+    "PSC",
+]
 kernel_search = ['poly', 'rbf', 'sigmoid']
 c_search = [0.1, 0.5, 1, 2, 5, 10, 20, 50, 100]
 gamma_search = ["auto", "scale", 1, 0.1, 0.01, 0.001]
@@ -335,7 +354,7 @@ c_final=100
 gamma_final="scale"
 
 # Treinamento
-treinamento = SVRSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, kernel=kernel_final, c=c_final, gamma=gamma_final, modo_otimizacao=False)
+treinamento = SVRSolarRegressor(target_local="salvador", train_test_split_ratio=0.2, in_n_measures=24, out_n_measures=24, kernel=kernel_final, c=c_final, gamma=gamma_final, modo_otimizacao=False, custom_input_features=features_final)
 
 # Mostrar Resultados
 models = sorted(load_all_svr_models())

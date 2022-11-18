@@ -18,7 +18,7 @@ import logging
 import gc
 import joblib
 
-BASE_DIR = "/home/b-rbmp-ideapad/Documents/GitHub/ml-solar-forecaster/"
+BASE_DIR = "/home/b-rbmp/Documents/GitHub/ml-solar-forecaster/"
 LSTM_MODELS_DIR = BASE_DIR + "desenvolvimento_modelos/neural_models/models/"
 
 @lru_cache(64)
@@ -112,7 +112,7 @@ def encoder_decoder_lstm_model(
     repeat_vector = layers.RepeatVector(forecast_horizon)(dropout1)
     lstm2 = layers.LSTM(128, bias_regularizer=regularizers.L2(1e-3), return_sequences=True)(repeat_vector)
     dropout2 = layers.Dropout(rate=0.1)(lstm2)
-    timedistributed_dense1 = layers.TimeDistributed(layers.Dense(64), activation="relu")(dropout2)
+    timedistributed_dense1 = layers.TimeDistributed(layers.Dense(64, activation="relu"))(dropout2)
     timedistributed_dropout1 = layers.TimeDistributed(layers.Dropout(rate=0.1))(timedistributed_dense1)
     timedistributed_dense2 = layers.TimeDistributed(layers.Dense(1))(timedistributed_dropout1)
     outputs = timedistributed_dense2
@@ -169,11 +169,11 @@ class NeuralTrainingModel:
         self.mae_teste_kj, self.loss_values, self.val_loss_values, self.r2_teste = self.rodar_instancia_treinamento()
 
     # Plot do MAE de validação x MAE de treino conforme o treinamento avançava
-    def plot_training_validation_loss(self):
+    def plot_training_validation_loss(self, arquitetura: str):
         epochs = range(1, len(self.loss_values) + 1)
         plt.plot(epochs, self.loss_values, "bo", label="Loss de Treinamento")
         plt.plot(epochs, self.val_loss_values, "b", label="Loss de Validação")
-        plt.title("Loss de Treinamento e Validação")
+        plt.title("Loss de Treinamento e Validação - " + arquitetura)
         plt.xlabel("Epochs")
         plt.ylabel("Loss")
         plt.legend()
@@ -335,7 +335,7 @@ class NeuralTrainingModel:
             callbacks=callbacks)
 
 
-        evaluation = modelo.evaluate(x=input_test, y=output_test, batch_size=self.batch_size)[1]
+        evaluation = modelo.evaluate(x=input_test, y=output_test, batch_size=self.batch_size)
         MAE_teste = evaluation[1]
         R2_teste = evaluation[2]
         mae_transform_scaler_shape_in = np.zeros(shape=[1, df.shape[1]])
@@ -350,7 +350,7 @@ class NeuralTrainingModel:
         #forecast_teste = modelo.predict(x=input_test, batch_size=None)
 
         # Salva o Scaler
-        joblib.dump(scaler, LSTM_MODELS_DIR+arquitetura_str+f"scaler.gz")
+        joblib.dump(scaler, LSTM_MODELS_DIR+arquitetura_str+f"/scaler.gz")
         
         return MAE_teste_kj, loss_values, val_loss_values, R2_teste
 
@@ -483,17 +483,18 @@ LOGGER.info(f"Iniciando Otimização de Hiperparâmetros")
 OTIMIZADOR_SEARCH = [tf.keras.optimizers.Adam(), tf.keras.optimizers.SGD(), tf.keras.optimizers.RMSprop()]
 LR_SEARCH = [0.01, 0.005, 0.001, 0.0005, 0.00001]
 
-for otimizador in OTIMIZADOR_SEARCH:
-    LOGGER.info(f"Otimizador: {otimizador}")
-    treinamento_object_vanilla_label = NeuralTrainingModel(model_function=vanilla_lstm_model, custom_input_forecast_features=input_forecast_features_final)
-    LOGGER.info(f'VANILLA:  MAE={treinamento_object_vanilla_label.mae_teste_kj} R2={treinamento_object_vanilla_label.r2_teste}')
-    treinamento_object_encoder_decoder_label = NeuralTrainingModel(model_function=encoder_decoder_lstm_model, custom_input_forecast_features=input_forecast_features_final)
-    LOGGER.info(f'ENCODER_DECODER: MAE={treinamento_object_encoder_decoder_label.mae_teste_kj} R2={treinamento_object_encoder_decoder_label.r2_teste}')
-    treinamento_object_cnn_lstm_label = NeuralTrainingModel(model_function=cnn_lstm_encoder_decoder_model, custom_input_forecast_features=input_forecast_features_final)
-    LOGGER.info(f'CNN_LSTM: MAE={treinamento_object_cnn_lstm_label.mae_teste_kj} R2={treinamento_object_cnn_lstm_label.r2_teste}')
+# for otimizador in OTIMIZADOR_SEARCH:
+#     LOGGER.info(f"Otimizador: {otimizador}")
+#     treinamento_object_vanilla_label = NeuralTrainingModel(model_function=vanilla_lstm_model, custom_input_forecast_features=input_forecast_features_final)
+#     LOGGER.info(f'VANILLA:  MAE={treinamento_object_vanilla_label.mae_teste_kj} R2={treinamento_object_vanilla_label.r2_teste}')
+#     treinamento_object_encoder_decoder_label = NeuralTrainingModel(model_function=encoder_decoder_lstm_model, custom_input_forecast_features=input_forecast_features_final)
+#     LOGGER.info(f'ENCODER_DECODER: MAE={treinamento_object_encoder_decoder_label.mae_teste_kj} R2={treinamento_object_encoder_decoder_label.r2_teste}')
+#     treinamento_object_cnn_lstm_label = NeuralTrainingModel(model_function=cnn_lstm_encoder_decoder_model, custom_input_forecast_features=input_forecast_features_final)
+#     LOGGER.info(f'CNN_LSTM: MAE={treinamento_object_cnn_lstm_label.mae_teste_kj} R2={treinamento_object_cnn_lstm_label.r2_teste}')
 
 # otimizador_final = tf.keras.optimizers.Adam(learning_rate=0.001)
 # for lr in LR_SEARCH:
+#     otimizador_final = tf.keras.optimizers.Adam(learning_rate=lr)
 #     LOGGER.info(f"lr: {lr}")
 #     treinamento_object_vanilla_label = NeuralTrainingModel(model_function=vanilla_lstm_model, custom_input_forecast_features=input_forecast_features_final, otimizador=otimizador_final)
 #     LOGGER.info(f'VANILLA:  MAE={treinamento_object_vanilla_label.mae_teste_kj} R2={treinamento_object_vanilla_label.r2_teste}')
@@ -501,6 +502,23 @@ for otimizador in OTIMIZADOR_SEARCH:
 #     LOGGER.info(f'ENCODER_DECODER: MAE={treinamento_object_encoder_decoder_label.mae_teste_kj} R2={treinamento_object_encoder_decoder_label.r2_teste}')
 #     treinamento_object_cnn_lstm_label = NeuralTrainingModel(model_function=cnn_lstm_encoder_decoder_model, custom_input_forecast_features=input_forecast_features_final, otimizador=otimizador_final)
 #     LOGGER.info(f'CNN_LSTM: MAE={treinamento_object_cnn_lstm_label.mae_teste_kj} R2={treinamento_object_cnn_lstm_label.r2_teste}')
+
+# Iniciando Treinamento Final
+lr_final = 0.001
+otimizador_final = tf.keras.optimizers.Adam(learning_rate=lr_final)
+
+LOGGER.info(f"TREINAMENTO FINAL")
+treinamento_object_vanilla_label = NeuralTrainingModel(model_function=vanilla_lstm_model, custom_input_forecast_features=input_forecast_features_final, otimizador=otimizador_final)
+LOGGER.info(f'VANILLA:  MAE={treinamento_object_vanilla_label.mae_teste_kj} R2={treinamento_object_vanilla_label.r2_teste}')
+treinamento_object_encoder_decoder_label = NeuralTrainingModel(model_function=encoder_decoder_lstm_model, custom_input_forecast_features=input_forecast_features_final, otimizador=otimizador_final)
+LOGGER.info(f'ENCODER_DECODER: MAE={treinamento_object_encoder_decoder_label.mae_teste_kj} R2={treinamento_object_encoder_decoder_label.r2_teste}')
+treinamento_object_cnn_lstm_label = NeuralTrainingModel(model_function=cnn_lstm_encoder_decoder_model, custom_input_forecast_features=input_forecast_features_final, otimizador=otimizador_final)
+LOGGER.info(f'CNN_LSTM: MAE={treinamento_object_cnn_lstm_label.mae_teste_kj} R2={treinamento_object_cnn_lstm_label.r2_teste}')
+
+# Plotagem de Training vs Val Loss
+treinamento_object_vanilla_label.plot_training_validation_loss(arquitetura="LSTM Comum")
+treinamento_object_encoder_decoder_label.plot_training_validation_loss(arquitetura="Encoder-Decoder LSTM")
+treinamento_object_cnn_lstm_label.plot_training_validation_loss(arquitetura="Encoder-Decoder CNN LSTM")
 
 print("FIM")
 

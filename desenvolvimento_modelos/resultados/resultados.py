@@ -839,7 +839,23 @@ def previsao_plot(modelos_results: List[ModelResults], data_inicio: str, data_fi
     plt.legend(["Alvo"] + list(resultados.columns))
     plt.show()
     
-
+def moving_average_irradiancia():
+    sns.set_context("talk")
+    df = pd.read_csv(f"{BASE_DIR}dados/pre_processado/salvador.csv")
+    n_dias = 100
+    df["Data_Horario"] = pd.to_datetime(df["Data_Horario"])
+    df = df[df["Data_Horario"].dt.hour == 15]
+    df['irradiância_rolling'] = df["IRRADIÂNCIA"].rolling(math.ceil(100)).mean()
+    df.dropna(axis=0, inplace=True)
+    fig, ax = plt.subplots(figsize=(18, 12))
+    sns.lineplot(x="Data_Horario",y="IRRADIÂNCIA",label="Irradiância Horária", data=df, ax=ax)
+    sns.lineplot(x="Data_Horario",y="irradiância_rolling", label=f"Irradiância - Média Móvel de {n_dias} dias", data=df, ax=ax)
+    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=12))
+    date_form = mdates.DateFormatter('%m/%Y')
+    ax.xaxis.set_major_formatter(date_form)
+    plt.xlabel("Data", size=14)
+    plt.ylabel("Irradiãncia Horária (W/m²)", size=14)
+    plt.show()
 
 persistencia_model = PersistenciaForecastObject(hora_problema=7)
 vanilla_lstm_model = LSTMForecastObject("vanilla_lstm", hora_problema=7, hora_inicio_periodo_solar=8, hora_fim_periodo_solar=22)
@@ -870,5 +886,7 @@ previsao_plot(modelos_results, data_inicio="2022-08-17", data_fim="2022-08-19")
 previsao_plot(modelos_results, data_inicio="2021-12-22", data_fim="2021-12-24")
 previsao_plot(modelos_results, data_inicio="2021-03-01", data_fim="2021-03-03")
 
+# Moving average irradiãncia
+moving_average_irradiancia()
 print("FIM")
 # Potencial ensemble somando tudo (talvez um modelo treinado? - talvez como trabalhos futuros)

@@ -777,7 +777,7 @@ def barplot_horizontal_r2(modelos_results: List[ModelResults]):
     plt.figure()
     ax = sns.barplot(data=resultados, orient="h")
     for i in ax.containers:
-        ax.bar_label(i,)
+        ax.bar_label(i, fontsize=11)
 
 def barplot_horizontal_mae_medio(modelos_results: List[ModelResults]):
     resultados = pd.DataFrame()
@@ -788,7 +788,7 @@ def barplot_horizontal_mae_medio(modelos_results: List[ModelResults]):
     plt.figure()
     ax = sns.barplot(data=resultados, orient="h")
     for i in ax.containers:
-        ax.bar_label(i,)
+        ax.bar_label(i, fontsize=11)
 
     plt.xlabel("Erro Absoluto Médio - MAE (W/m²)")
 
@@ -865,9 +865,8 @@ rf_model = SKLearnForecastObject("randomforest", hora_problema=7, hora_inicio_pe
 svr_model = SKLearnForecastObject("svr", hora_problema=7, hora_inicio_periodo_solar=8, hora_fim_periodo_solar=22)
 gtb_model = SKLearnForecastObject("gtb", hora_problema=7, hora_inicio_periodo_solar=8, hora_fim_periodo_solar=22)
 
-
 modelos_results=[vanilla_lstm_model.resultados, encoder_decoder_lstm_model.resultados, encoder_decoder_cnn_lstm_model.resultados, rf_model.resultados, svr_model.resultados, gtb_model.resultados, persistencia_model.resultados]
-# Histograma de erros para cada modelo (multiplot) em hora especifica
+#Histograma de erros para cada modelo (multiplot) em hora especifica
 histograma_erros_hora_multiplot(modelos_results=modelos_results, hora_utc_0=12)
 histograma_erros_hora_multiplot(modelos_results=modelos_results, hora_utc_0=15)
 histograma_erros_hora_multiplot(modelos_results=modelos_results, hora_utc_0=20)

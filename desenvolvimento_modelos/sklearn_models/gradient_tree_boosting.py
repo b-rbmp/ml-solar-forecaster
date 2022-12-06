@@ -329,7 +329,7 @@ subsample_search = [0.2, 0.5, 0.8, 1]
 criterion_search = ['friedman_mse', 'squared_error', 'mse']
 max_depth_search = [2, 3, 5, 8, 12, 14]
 min_samples_split_search = [2, 3, 5, 7]
-min_samples_leaf_search = [2, 3, 5, 7]
+min_samples_leaf_search = [1, 2, 3, 5, 7]
 max_features_search = ["sqrt", "log2", None]
 
 # for n_estimators in n_estimators_search:

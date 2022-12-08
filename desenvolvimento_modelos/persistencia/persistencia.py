@@ -55,23 +55,25 @@ class PersistenciaModel:
     # Scatter plot de Previsões x Target - conjunto de validação
     def plot_scatter_previsoes_targets_validacao(self):
         plt.figure()
+        sns.set(font_scale=1.3)
         sns.scatterplot(
             x=self.series_validacao["previsao_persistencia"],
             y=self.series_validacao["IRRADIÂNCIA"],
         )
-        plt.xlabel("Persistência (W/m²)")
-        plt.ylabel("Alvo Validação (W/m²)")
+        plt.xlabel("Persistência (W/m²)", fontsize=18)
+        plt.ylabel("Alvo Validação (W/m²)", fontsize=18)
         plt.show()
 
     # Scatter plot de Previsões x Target - conjunto de teste
     def plot_scatter_previsoes_targets_teste(self):
         plt.figure()
+        sns.set(font_scale=1.3)
         sns.scatterplot(
             x=self.series_teste["previsao_persistencia"],
             y=self.series_teste["IRRADIÂNCIA"],
         )
-        plt.xlabel("Persistência (W/m²)")
-        plt.ylabel("Alvo Teste (W/m²)")
+        plt.xlabel("Persistência (W/m²)", fontsize=18)
+        plt.ylabel("Alvo Teste (W/m²)", fontsize=18)
         plt.show()
 
     # Plota as previsões vs target de um dos conjuntos
@@ -84,9 +86,12 @@ class PersistenciaModel:
         ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
         date_form = mdates.DateFormatter('%d/%m')
         ax.xaxis.set_major_formatter(date_form)
+        ax.tick_params(axis='x', labelsize=19)
+        ax.tick_params(axis='x', which="minor", labelsize=20)
+        ax.tick_params(axis='y', labelsize=19)
         plt.legend(loc="upper right")
-        plt.ylabel("Irradiância (W/m²)")
-        plt.xlabel("Data")
+        plt.ylabel("Irradiância (W/m²)", fontsize=22)
+        plt.xlabel("Data", fontsize=22)
         plt.show()
 
 

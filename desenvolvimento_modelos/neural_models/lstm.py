@@ -174,9 +174,9 @@ class NeuralTrainingModel:
         plt.plot(epochs, self.loss_values, "bo", label="Loss de Treinamento")
         plt.plot(epochs, self.val_loss_values, "b", label="Loss de Validação")
         plt.title("Loss de Treinamento e Validação - " + arquitetura)
-        plt.xlabel("Epochs")
-        plt.ylabel("Loss")
-        plt.legend()
+        plt.xlabel("Epochs", fontsize=18)
+        plt.ylabel("Loss", fontsize=18)
+        plt.legend(fontsize=16)
         plt.show()
 
     # Scatter plot de Previsões x Target

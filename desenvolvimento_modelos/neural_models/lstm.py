@@ -174,9 +174,10 @@ class NeuralTrainingModel:
         plt.plot(epochs, self.loss_values, "bo", label="Loss de Treinamento")
         plt.plot(epochs, self.val_loss_values, "b", label="Loss de Validação")
         plt.title("Loss de Treinamento e Validação - " + arquitetura)
-        plt.xlabel("Epochs", fontsize=18)
-        plt.ylabel("Loss", fontsize=18)
-        plt.legend(fontsize=16)
+        plt.xlabel("Epochs", fontsize=22)
+        plt.ylabel("Loss", fontsize=22)
+        plt.tick_params(axis="both", labelsize=18)
+        plt.legend(fontsize=18)
         plt.show()
 
     # Scatter plot de Previsões x Target
@@ -521,5 +522,3 @@ treinamento_object_encoder_decoder_label.plot_training_validation_loss(arquitetu
 treinamento_object_cnn_lstm_label.plot_training_validation_loss(arquitetura="Encoder-Decoder CNN LSTM")
 
 print("FIM")
-
-

@@ -743,30 +743,36 @@ def histograma_erros_hora_multiplot(modelos_results: List[ModelResults], hora_ut
             sns.histplot(data=resultados, x=resultados.columns[i], kde=True, ax=axis, bins=20)
             axis.set_ylabel("")
             axis.set_xlabel("")
-            axis.set_title(label=resultados.columns[i], y=0.78)
+            axis.set_title(label=resultados.columns[i], y=0.78, fontsize=22)
+            axis.tick_params(axis='both', which='both', labelsize=18)
             i = i+1
-    fig.supxlabel('Erro Absoluto (W/m²)', y=0.05)
-    fig.supylabel('N° Ocorrências', x=0.075)
+    fig.supxlabel('Erro Absoluto (W/m²)', y=0.02, fontsize=22)
+    fig.supylabel('N° Ocorrências', x=0.06, fontsize=22)
     plt.show()
 
 def kde_erros_hora(modelos_results: List[ModelResults], hora_utc_0 = 15):
     resultados = pd.DataFrame()
     
+    colunas = []
     for modelo_result in modelos_results:
         resultados_agregados = modelo_result.agregado_resultados
         resultados_agregados_filtrado = resultados_agregados[pd.to_datetime(resultados_agregados["data"]).dt.hour == hora_utc_0]
         resultados_agregados_filtrado.set_index("data", inplace=True, drop=True)
         resultados[modelo_result.identificador] = np.subtract(resultados_agregados_filtrado["previsao"], resultados_agregados_filtrado["target"])
-    
+        colunas.append(modelo_result.identificador)
+
     plt.figure()
-    sns.kdeplot(data=resultados)
+    sns.set(font_scale=1.5)
+    sns.kdeplot(data=resultados, legend=True)
 
 
-    plt.xlabel("Erro (W/m²)")
-    plt.ylabel("Densidade de Probabilidade")
-
+    plt.xlabel("Erro (W/m²)", fontsize=22)
+    plt.ylabel("Densidade de Probabilidade", fontsize=22)
+    plt.tick_params(axis='x', labelsize=18)
+    plt.tick_params(axis='y', labelsize=18)
     plt.grid()
     plt.show()
+
 
 def barplot_horizontal_r2(modelos_results: List[ModelResults]):
     resultados = pd.DataFrame()
@@ -774,10 +780,17 @@ def barplot_horizontal_r2(modelos_results: List[ModelResults]):
     for modelo_result in modelos_results:
         resultados[modelo_result.identificador] = [modelo_result.r2]
 
-    plt.figure()
+    plt.figure(figsize=(14, 5))
     ax = sns.barplot(data=resultados, orient="h")
     for i in ax.containers:
-        ax.bar_label(i, fontsize=11)
+        ax.bar_label(i, fontsize=17)
+
+    ax.tick_params(axis='x', labelsize=17)
+    ax.tick_params(axis='y', labelsize=17)
+    plt.xlabel("Coeficiente de Determinação (R²)", fontsize=20)
+    plt.tight_layout()
+
+    plt.show()
 
 def barplot_horizontal_mae_medio(modelos_results: List[ModelResults]):
     resultados = pd.DataFrame()
@@ -785,28 +798,36 @@ def barplot_horizontal_mae_medio(modelos_results: List[ModelResults]):
     for modelo_result in modelos_results:
         resultados[modelo_result.identificador] = [round(np.mean(modelo_result.mae), 2)]
 
-    plt.figure()
+    plt.figure(figsize=(14, 5))
     ax = sns.barplot(data=resultados, orient="h")
     for i in ax.containers:
-        ax.bar_label(i, fontsize=11)
+        ax.bar_label(i, fontsize=17)
 
-    plt.xlabel("Erro Absoluto Médio - MAE (W/m²)")
+    ax.tick_params(axis='x', labelsize=17)
+    ax.tick_params(axis='y', labelsize=17)
+    plt.xlabel("Erro Absoluto Médio - MAE (W/m²)", fontsize=20)
+    plt.tight_layout()
+    plt.show()
 
 def lineplot_mae_horario(modelos_results: List[ModelResults]):
     resultados = pd.DataFrame()
     
+    colunas = []
     for modelo_result in modelos_results:
         resultados[modelo_result.identificador] = modelo_result.mae
+        colunas.append(modelo_result.identificador)
     
     plt.figure()
-    sns.lineplot(data=resultados, markers=True, dashes=False)
+    sns.lineplot(data=resultados, markers=True, dashes=False, legend=True)
 
-    plt.xlabel("Hora UTC-0")
-    plt.ylabel("Erro Absoluto Médio - MAE (W/m²)")
+    plt.xlabel("Hora UTC-0", fontsize=22)
+    plt.ylabel("Erro Absoluto Médio - MAE (W/m²)", fontsize=22)
     indices = [i for i in range(0, len(modelos_results[0].mae))]
     plt.xticks(indices)
+    plt.tick_params(axis='x', labelsize=18)
+    plt.tick_params(axis='y', labelsize=18)
     plt.grid()
-    plt.legend()
+    plt.legend(fontsize=18)
     plt.show()
 
 def previsao_plot(modelos_results: List[ModelResults], data_inicio: str, data_fim: str):
@@ -827,16 +848,18 @@ def previsao_plot(modelos_results: List[ModelResults], data_inicio: str, data_fi
     ax.plot(pd.to_datetime(resultados.index).values, resultados.drop("target", axis=1), marker=".")
 
 
-    plt.xlabel("Data e Hora UTC-0")
-    plt.ylabel("Irradiância Solar Horária (W/m²)")
+    plt.xlabel("Data e Hora UTC-0", fontsize=22)
+    plt.ylabel("Irradiância Solar Horária (W/m²)", fontsize=22)
     
     # Format the x axis
-    ax.xaxis.set_major_locator(mdates.HourLocator(interval=6))
+    ax.xaxis.set_major_locator(mdates.HourLocator(interval=12))
     date_form = mdates.DateFormatter('%d/%m/%Y %H:%M')
     ax.xaxis.set_major_formatter(date_form)
 
+    ax.tick_params(axis='x', labelsize=18)
+    ax.tick_params(axis='y', labelsize=18)
     plt.grid()
-    plt.legend(["Alvo"] + list(resultados.columns))
+    plt.legend(["Alvo"] + list(resultados.columns), fontsize=18)
     plt.show()
     
 def moving_average_irradiancia():
@@ -853,8 +876,11 @@ def moving_average_irradiancia():
     ax.xaxis.set_major_locator(mdates.MonthLocator(interval=12))
     date_form = mdates.DateFormatter('%m/%Y')
     ax.xaxis.set_major_formatter(date_form)
-    plt.xlabel("Data", size=14)
-    plt.ylabel("Irradiãncia Horária (W/m²)", size=14)
+    plt.xlabel("Data", fontsize=22)
+    plt.ylabel("Irradiãncia Horária (W/m²)", fontsize=22)
+    plt.legend(fontsize=18)
+    plt.tick_params(axis='x', labelsize=18)
+    plt.tick_params(axis='y', labelsize=18)
     plt.show()
 
 persistencia_model = PersistenciaForecastObject(hora_problema=7)

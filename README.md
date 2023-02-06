@@ -6,6 +6,6 @@
 
 🇫🇷 Projet de fin d'études pour l'obtention du diplôme d'Ingénieur Génie Électrique dans l'Université Fédérale de Bahia (UFBA) sur l'implementation des réseaux neuronaux et d'autres algorithmes d'Apprentissage Machine pour la prévision des prochaines 24 heures à partir de mesures d'une station locale de l'Institut National de Météorologie du Brésil (INMET) et des données météo du modèle numérique MERRA-2.
 
-## Trabalho 
+## Paper 
 
-EM BREVE
+[Download the Senior Thesis](https://github.com/b-rbmp/ml-solar-forecaster/blob/main/Senior_Thesis.pdf)
